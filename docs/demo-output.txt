@@ -1,0 +1,5 @@
+tinytrace | zero runtime dependencies | real local HTTP
+[9b440cf9f5619347] count=1 "Payment provider unavailable"
+[9b440cf9f5619347] count=2 "Payment provider unavailable"
+[a3a95af280a089bc] count=1 "Checkout demo completed"
+Delivered: true | Groups: 2 | Events: 3

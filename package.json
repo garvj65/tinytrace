@@ -1,0 +1,57 @@
+{
+  "name": "@garvj65/tinytrace",
+  "version": "0.1.0",
+  "description": "A small, zero-runtime-dependency error tracking SDK for Node.js",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "docs/demo.gif",
+    "docs/SDK.md",
+    "docs/VALIDATION.md",
+    "RELEASING.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "demo": "npm run build && node examples/demo.mjs",
+    "ingest": "npm run build && node dist/server.js",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm test"
+  },
+  "keywords": [
+    "errors",
+    "monitoring",
+    "sdk",
+    "typescript"
+  ],
+  "author": "Garv Jhajharia",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "5.9.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/garvj65/tinytrace.git"
+  },
+  "homepage": "https://github.com/garvj65/tinytrace#readme",
+  "bugs": {
+    "url": "https://github.com/garvj65/tinytrace/issues"
+  }
+}

@@ -1,0 +1,2 @@
+Clean-consumer ESM import + real HTTP capture: PASS (2 events)
+Installed runtime dependency count: 0

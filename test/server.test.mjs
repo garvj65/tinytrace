@@ -1,0 +1,21 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createIngest } from '../dist/server.js';
+import { buildEvent } from '../dist/event.js';
+import { listen } from './helpers.mjs';
+test('ingest groups, deduplicates, and validates a whole batch before changing counts', async t => {
+  const lines = [], { server, groups } = createIngest(line => lines.push(line));
+  const endpoint = await listen(t, server), e = buildEvent('hello', false);
+  const post = async value => { const res = await fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(value) }); await res.text(); return res.status; };
+  assert.equal(await post({ events: [e, e, buildEvent('hello', false)] }), 202);
+  assert.equal(groups.get(e.fingerprint), 2); assert.equal(lines.length, 2);
+  assert.equal(await post({ events: [buildEvent('hello', false), {}] }), 400); assert.equal(groups.get(e.fingerprint), 2);
+  assert.equal(await post({ events: [] }), 400);
+  const wrongType = await fetch(endpoint, { method: 'POST', body: '{}' });
+  assert.equal(wrongType.status, 415); await wrongType.text();
+  const wrong = await fetch(endpoint); assert.equal(wrong.status, 404); await wrong.text();
+  const bad = await fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{' });
+  assert.equal(bad.status, 400); await bad.text();
+  const large = await fetch(endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body: 'x'.repeat(1048577) });
+  assert.equal(large.status, 413); await large.text();
+});
