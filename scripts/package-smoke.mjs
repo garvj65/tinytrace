@@ -8,7 +8,7 @@ const npm = (args, cwd = root) => execFileSync(process.execPath, [process.env.np
 try {
   const [pack] = JSON.parse(npm(['pack', '--json', '--ignore-scripts']));
   assert.ok(pack.files.some(f => f.path === 'dist/index.d.ts'));
-  assert.ok(pack.files.some(f => f.path === 'docs/demo.gif'));
+  for (const path of ['docs/demo.gif', 'SECURITY.md', 'CHANGELOG.md']) assert.ok(pack.files.some(f => f.path === path));
   assert.ok(pack.files.every(f => !/(^|\/)(test|src|node_modules|\.github)(\/|$)|\.npmrc|\.env/.test(f.path)));
   writeFileSync(join(consumer, 'package.json'), JSON.stringify({ name: 'consumer', version: '1.0.0', type: 'module', private: true }));
   npm(['install', resolve(root, pack.filename), '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], consumer);

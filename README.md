@@ -151,15 +151,15 @@ These are pattern-based safeguards, not a guarantee that arbitrary personal data
 
 | Path | Responsibility |
 | --- | --- |
-| [`src/index.ts`](src/index.ts) | Public API, context, global handlers, and client lifecycle. |
-| [`src/event.ts`](src/event.ts) | Event building, stack parsing, IDs, and fingerprints. |
-| [`src/privacy.ts`](src/privacy.ts) | Hook-output validation, schema snapshots, and default redaction. |
-| [`src/transport.ts`](src/transport.ts) | Queue, batching, HTTP requests, retry, and deadlines. |
-| [`src/server.ts`](src/server.ts) | Standalone loopback ingest server and grouping. |
-| [`src/types.ts`](src/types.ts) | Event schema, options, and shared bounds. |
-| [`test/`](test/) | Unit, integration, and fatal-error child-process tests. |
-| [`examples/demo.mjs`](examples/demo.mjs) | Self-contained SDK-to-ingest demonstration. |
-| [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | Node version matrix and automated verification. |
+| [`src/index.ts`](https://github.com/garvj65/tinytrace/blob/main/src/index.ts) | Public API, context, global handlers, and client lifecycle. |
+| [`src/event.ts`](https://github.com/garvj65/tinytrace/blob/main/src/event.ts) | Event building, stack parsing, IDs, and fingerprints. |
+| [`src/privacy.ts`](https://github.com/garvj65/tinytrace/blob/main/src/privacy.ts) | Hook-output validation, schema snapshots, and default redaction. |
+| [`src/transport.ts`](https://github.com/garvj65/tinytrace/blob/main/src/transport.ts) | Queue, batching, HTTP requests, retry, and deadlines. |
+| [`src/server.ts`](https://github.com/garvj65/tinytrace/blob/main/src/server.ts) | Standalone loopback ingest server and grouping. |
+| [`src/types.ts`](https://github.com/garvj65/tinytrace/blob/main/src/types.ts) | Event schema, options, and shared bounds. |
+| [`test/`](https://github.com/garvj65/tinytrace/tree/main/test) | Unit, integration, and fatal-error child-process tests. |
+| [`examples/demo.mjs`](https://github.com/garvj65/tinytrace/blob/main/examples/demo.mjs) | Self-contained SDK-to-ingest demonstration. |
+| [`.github/workflows/ci.yml`](https://github.com/garvj65/tinytrace/blob/main/.github/workflows/ci.yml) | Node version matrix and automated verification. |
 | [`docs/SDK.md`](docs/SDK.md) | API reference and design details. |
 
 ## Development and verification
