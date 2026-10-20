@@ -32,7 +32,8 @@
     "prepublishOnly": "npm run check",
     "verify:package": "npm run build && node scripts/package-smoke.mjs",
     "check:budget": "node scripts/check-budget.mjs",
-    "check": "npm test && npm run check:budget && npm run demo && npm run verify:package"
+    "check": "npm test && npm run check:budget && npm run demo && npm run verify:package",
+    "verify:registry": "npm run build && node scripts/verify-registry.mjs"
   },
   "keywords": [
     "errors",

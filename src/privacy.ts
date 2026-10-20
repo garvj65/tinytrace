@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto';
 import type { TraceEvent } from './types.js';
-const secretKey = /password|passwd|secret|token|api[-_]?key|authorization|cookie/i;
+const secretKey = /password|passwd|pwd|secret|token|api[-_]?key|authorization|cookie|credential|session/i;
 const str = (x: unknown, max: number): x is string => typeof x === 'string' && x.length <= max;
 const obj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
 function clean(value: string): string {
   return value
+    .replace(/-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----[\s\S]*?(?:-----END (?:[A-Z ]+ )?PRIVATE KEY-----|$)/g, '[Redacted]')
+    .replace(/\b(?:AIza[A-Za-z0-9_-]{30,}|(?:xox[baprs]|xapp)-[A-Za-z0-9-]{15,})\b/g, '[Redacted]')
     .replace(/\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+\/=-]+/gi, '[Redacted]')
     .replace(/\b(?:set-cookie|cookie)\s*[:=][^\r\n]*/gi, 'cookie=[Redacted]')
     .replace(/\b(?:sk-(?:proj-|svcacct-)?|gh[pousr]_|github_pat_|npm_)[A-Za-z0-9_-]{16,}\b/g, '[Redacted]')
@@ -19,7 +21,7 @@ function scrub(value: unknown, key = ''): unknown {
   if (secretKey.test(key)) return '[Redacted]';
   if (typeof value === 'string') return clean(value);
   if (Array.isArray(value)) return value.map(item => scrub(item));
-  if (obj(value)) return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, scrub(v, k)]));
+  if (obj(value)) return Object.fromEntries(Object.entries(value).map(([k, v]) => [clean(k), scrub(v, k)]));
   return value;
 }
 export function prepareEvent(value: unknown, redact = true): TraceEvent | null {
