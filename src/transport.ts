@@ -93,7 +93,7 @@ export class Transport {
           const raw = typeof hint === 'string' ? hint : '';
           const retryAfter = raw ? (/^\d+$/.test(raw) ? +raw * 1000 : Date.parse(raw) - Date.now()) : 0;
           res.on('error', () => done());
-          res.on('end', () => done(res.statusCode, Number.isFinite(retryAfter) ? Math.max(0, retryAfter) : 0));
+          res.on('end', () => done(res.statusCode, Number.isNaN(retryAfter) ? 0 : Math.max(0, retryAfter)));
           res.resume();
         });
         req.on('socket', socket => socket.unref());

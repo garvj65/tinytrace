@@ -77,3 +77,10 @@ test('real HTTP Retry-After seconds are honored and dates beyond budget stop ret
   const overBudget = transport(t, dated, { maxDelay: 10 }); overBudget.enqueue(event());
   assert.equal(await overBudget.flush(), false); assert.equal(datedCalls, 1);
 });
+
+test('unrepresentably long Retry-After is not treated as an immediate retry', async t => {
+  let calls = 0;
+  const endpoint = await listen(t, (_req, res) => { calls++; res.writeHead(429, { 'retry-after': '9'.repeat(400) }); res.end(); });
+  const tx = transport(t, endpoint); tx.enqueue(event());
+  assert.equal(await tx.flush(), false); assert.equal(calls, 1);
+});

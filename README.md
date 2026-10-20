@@ -22,7 +22,7 @@ Monitoring SDKs run inside someone else's application. They need to capture enou
 
 **tinytrace explores that engineering problem in a small, readable codebase.** It follows an error from capture through stack parsing, contextual enrichment, filtering, batching, retry, and local ingestion. A tiny HTTP server completes the loop by deduplicating events and grouping recurring errors by fingerprint.
 
-The objective is to understand and demonstrate how an error-tracking SDK is designed: its public API, lifecycle, transport, failure behavior, and tradeoffs. The initial implementation, tests, and demo fit within **766 handwritten lines**, including validation scripts.
+The objective is to understand and demonstrate how an error-tracking SDK is designed: its public API, lifecycle, transport, failure behavior, and tradeoffs. The initial implementation, tests, and demo fit within **773 handwritten lines**, including validation scripts.
 
 ## What it does
 
@@ -167,7 +167,7 @@ These are pattern-based safeguards, not a guarantee that arbitrary personal data
 | Command | Purpose |
 | --- | --- |
 | `npm run build` | Compile TypeScript into `dist/` with declarations. |
-| `npm test` | Build and run the 36-test regression suite. |
+| `npm test` | Build and run the 37-test regression suite. |
 | `npm run check` | Tests, code-size guard, demo, and clean-consumer package/type checks. |
 | `npm run verify:package` | Install the packed tarball and exercise its HTTP API and declarations. |
 | `npm run demo` | Run the complete local capture-to-ingest flow. |
