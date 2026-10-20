@@ -10,7 +10,7 @@ The committed CI workflow is the source of current pass/fail evidence: [Actions]
 | Lifecycle bounds | Child-process shutdown duration, confirmed in-flight background requests, and repeated listener cleanup. |
 | Demo | Real loopback HTTP: 3 events grouped into 2 issues, delivery true. The GIF illustrates this flow; fingerprint values may differ across releases. |
 | Package consumer | Install the actual tarball without development dependencies; exercise HTTP delivery and default redaction, then type-check consumer imports and an intentionally invalid option. |
-| Size | 765 handwritten TypeScript/JavaScript lines including tests, demo, and verification scripts; 410 lines are runtime SDK/server code. CI enforces fewer than 800 lines. |
+| Size | 766 handwritten TypeScript/JavaScript lines including tests, demo, and verification scripts; 410 lines are runtime SDK/server code. CI enforces fewer than 800 lines. |
 | Secret scanning | Gitleaks 8.24.3 with full Git history. Test tokens are synthetic. |
 | Static analysis | CodeQL JavaScript/TypeScript security-extended queries; CI fails if the generated SARIF contains findings. |
 | Dependency integrity | npm advisory checks including development dependencies and npm registry signature verification. Runtime dependencies: zero. |

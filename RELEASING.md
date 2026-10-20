@@ -37,4 +37,4 @@ See npm's official [publishing guide](https://docs.npmjs.com/creating-and-publis
 
 ## Version changes
 
-Bump `package.json` and both root version fields in `package-lock.json` together. Every published package artifact is immutable, including its packaged README and reference docs. A change to shipped content needs a new version before the next publish. Check the published version and integrity using `npm run verify:registry`; a green source CI run alone does not prove publication.
+Bump `package.json`, both root version fields in `package-lock.json`, and the fixed package/version allowlist in `scripts/verify-registry.mjs` together. Every published package artifact is immutable, including its packaged README and reference docs. A change to shipped content needs a new version before the next publish. Check the published version and integrity using `npm run verify:registry`; a green source CI run alone does not prove publication.
