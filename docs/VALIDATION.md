@@ -5,12 +5,12 @@ The committed CI workflow is the source of current pass/fail evidence: [Actions]
 | Check | Verification |
 | --- | --- |
 | Strict TypeScript build | ESM JavaScript and declarations; checked indices and unused locals/parameters. |
-| Regression suite | 37 tests, including host on/once/prepended handlers before and after init, strict rejection deduplication, privacy, hook schema rejection, real HTTP Retry-After, and ingest validation. |
+| Regression suite | 39 tests, including host on/once/prepended handlers before and after init, strict rejection deduplication, privacy, hook schema rejection, real HTTP Retry-After, and ingest validation. |
 | Platforms | Linux Node 22, 24, 26; Windows Node 24. |
 | Lifecycle bounds | Child-process shutdown duration, confirmed in-flight background requests, and repeated listener cleanup. |
 | Demo | Real loopback HTTP: 3 events grouped into 2 issues, delivery true. The GIF illustrates this flow; fingerprint values may differ across releases. |
 | Package consumer | Install the actual tarball without development dependencies; exercise HTTP delivery and default redaction, then type-check consumer imports and an intentionally invalid option. |
-| Size | 773 handwritten TypeScript/JavaScript lines including tests, demo, and verification scripts; 410 lines are runtime SDK/server code. CI enforces fewer than 800 lines. |
+| Size | 789 handwritten TypeScript/JavaScript lines including tests, demo, and verification scripts; 410 lines are runtime SDK/server code. CI enforces fewer than 800 lines. |
 | Secret scanning | Gitleaks 8.24.3 with full Git history. Test tokens are synthetic. |
 | Static analysis | CodeQL JavaScript/TypeScript security-extended queries; CI fails if the generated SARIF contains findings. |
 | Dependency integrity | npm advisory checks including development dependencies and npm registry signature verification. Runtime dependencies: zero. |

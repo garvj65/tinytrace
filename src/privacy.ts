@@ -54,7 +54,7 @@ export function prepareEvent(value: unknown, redact = true): TraceEvent | null {
       frames: event.exception.frames.map(({ filename, lineno, colno, function: fn }) => ({ filename, lineno, colno, ...(fn === undefined ? {} : { function: fn }) })) };
     if (!redact) return event;
     const safe = scrub(event) as TraceEvent;
-    safe.fingerprint = createHash('sha256').update(JSON.stringify([safe.exception?.type ?? 'message',
+    safe.fingerprint = createHash('sha256').update(JSON.stringify([safe.exception ? 'exception' : 'message', safe.exception?.type,
       safe.message, safe.exception?.frames.slice(0, 5).map(f => [f.filename, f.function]) ?? []])).digest('hex').slice(0, 16);
     return safe;
   } catch { return null; }

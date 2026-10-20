@@ -58,3 +58,13 @@ test('fatal diagnostics never print raw errors, even when hooks drop them', asyn
     setTimeout(() => { throw Error('password=' + 'private-value'); }, 0);`);
   assert.equal(result.code, 1); assert.doesNotMatch(result.stderr, /private-value|password=/);
 });
+
+test('host ownership remains delegated while a once handler performs asynchronous cleanup', async t => {
+  const events = [], endpoint = await listen(t, async (req, res) => { events.push(...(await body(req)).events); res.end(); });
+  const result = await child(t, `import { init, close } from ${JSON.stringify(sdk)};
+    process.once('unhandledRejection', () => {
+      setTimeout(() => Promise.reject(Error('during cleanup')), 10);
+      setTimeout(async () => { await close(); process.exit(7); }, 100);
+    }); init({endpoint:${JSON.stringify(endpoint)}}); Promise.reject(Error('first'));`);
+  assert.equal(result.code, 7); assert.equal(events.length, 2);
+});

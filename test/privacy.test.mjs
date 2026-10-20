@@ -57,3 +57,9 @@ test('private key blocks and provider tokens are scrubbed without modifying inpu
   assert.ok(safe); assert.doesNotMatch(JSON.stringify(safe), /private-material|x{32}/);
   assert.equal(event.message, original);
 });
+
+test('message events and custom exception names cannot share a fingerprint namespace', () => {
+  const error = Error('same'); error.name = 'message'; error.stack = 'message: same';
+  assert.notEqual(buildEvent(error, true).fingerprint, buildEvent('same', false).fingerprint);
+  assert.notEqual(sdk.redactEvent(buildEvent(error, true)).fingerprint, sdk.redactEvent(buildEvent('same', false)).fingerprint);
+});

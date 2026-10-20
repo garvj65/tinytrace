@@ -20,8 +20,8 @@ export function buildEvent(value: unknown, error: boolean): TraceEvent {
       }
     } catch { /* A throwing getter must not escape into the application. */ }
   }
-  const signature = [error ? type : 'message', message,
-    ...frames.slice(0, 5).map(f => `${f.filename}:${f.function ?? ''}`)].join('\n');
+  const signature = JSON.stringify([error ? 'exception' : 'message', type, message,
+    frames.slice(0, 5).map(f => [f.filename, f.function ?? ''])]);
   return {
     event_id: randomUUID().replaceAll('-', ''), timestamp: new Date().toISOString(),
     platform: 'node', level: error ? 'error' : 'info', message, environment: 'development',

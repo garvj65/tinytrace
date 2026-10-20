@@ -22,7 +22,7 @@ Monitoring SDKs run inside someone else's application. They need to capture enou
 
 **tinytrace explores that engineering problem in a small, readable codebase.** It follows an error from capture through stack parsing, contextual enrichment, filtering, batching, retry, and local ingestion. A tiny HTTP server completes the loop by deduplicating events and grouping recurring errors by fingerprint.
 
-The objective is to understand and demonstrate how an error-tracking SDK is designed: its public API, lifecycle, transport, failure behavior, and tradeoffs. The initial implementation, tests, and demo fit within **773 handwritten lines**, including validation scripts.
+The objective is to understand and demonstrate how an error-tracking SDK is designed: its public API, lifecycle, transport, failure behavior, and tradeoffs. The initial implementation, tests, and demo fit within **789 handwritten lines**, including validation scripts.
 
 ## What it does
 
@@ -167,7 +167,7 @@ These are pattern-based safeguards, not a guarantee that arbitrary personal data
 | Command | Purpose |
 | --- | --- |
 | `npm run build` | Compile TypeScript into `dist/` with declarations. |
-| `npm test` | Build and run the 37-test regression suite. |
+| `npm test` | Build and run the 39-test regression suite. |
 | `npm run check` | Tests, code-size guard, demo, and clean-consumer package/type checks. |
 | `npm run verify:package` | Install the packed tarball and exercise its HTTP API and declarations. |
 | `npm run demo` | Run the complete local capture-to-ingest flow. |
@@ -180,7 +180,7 @@ See the [CI runs](https://github.com/garvj65/tinytrace/actions) and [validation 
 
 ## Scope and release status
 
-The v1 code includes the core SDK, transport, local ingest server, privacy and lifecycle hardening, regression tests, package-consumer checks, demo, documentation, and automated security gates. the configured package name is **`@garvj65/tinytrace`**. The [release workflow](.github/workflows/publish.yml) publishes after trusted main-branch CI succeeds and verifies the registry tarball integrity. Publication is complete only when `npm run verify:registry` confirms the released artifact. Run from source or install a locally generated tarball until then. See the [release guide](RELEASING.md), [changelog](CHANGELOG.md), and [security scope](SECURITY.md).
+The v1 code includes the core SDK, transport, local ingest server, privacy and lifecycle hardening, regression tests, package-consumer checks, demo, documentation, and automated security gates. The configured package name is **`@garvj65/tinytrace`**. The [release workflow](.github/workflows/publish.yml) publishes after trusted main-branch CI succeeds and verifies the registry tarball integrity. Publication is complete only when `npm run verify:registry` confirms the released artifact. Run from source or install a locally generated tarball until then. See the [release guide](RELEASING.md), [changelog](CHANGELOG.md), and [security scope](SECURITY.md).
 
 Source maps, a UI, performance monitoring, framework adapters, and durable storage are outside the initial scope. A Sentry-compatible envelope adapter is a possible extension; the current local ingest format is not Sentry-compatible.
 
