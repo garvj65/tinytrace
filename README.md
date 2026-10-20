@@ -22,7 +22,7 @@ Monitoring SDKs run inside someone else's application. They need to capture enou
 
 **tinytrace explores that engineering problem in a small, readable codebase.** It follows an error from capture through stack parsing, contextual enrichment, filtering, batching, retry, and local ingestion. A tiny HTTP server completes the loop by deduplicating events and grouping recurring errors by fingerprint.
 
-The objective is to understand and demonstrate how an error-tracking SDK is designed: its public API, lifecycle, transport, failure behavior, and tradeoffs. The initial implementation, tests, and demo fit within **551 handwritten lines**.
+The objective is to understand and demonstrate how an error-tracking SDK is designed: its public API, lifecycle, transport, failure behavior, and tradeoffs. The initial implementation, tests, and demo fit within **765 handwritten lines**, including validation scripts.
 
 ## What it does
 
@@ -30,7 +30,7 @@ The objective is to understand and demonstrate how an error-tracking SDK is desi
 | --- | --- |
 | **Capture** | Manual exceptions and messages, plus automatic `uncaughtException` and `unhandledRejection` capture. |
 | **Context** | Parsed V8 stack frames, environment labels, tags, and a rolling breadcrumb history. |
-| **Control** | Per-event sampling and a synchronous `beforeSend` hook for redaction or filtering. |
+| **Control** | Per-event sampling, a synchronous `beforeSend` hook, schema validation, and default event redaction. |
 | **Delivery** | Bounded batching queue, one request at a time, request deadlines, and finite retries with exponential backoff and jitter. |
 | **Ingestion** | Local HTTP endpoint, stable event IDs, bounded deduplication, and fingerprint-based grouping. |
 | **Lifecycle** | Explicit `flush()` and `close()`, listener cleanup, and a bounded fatal-error delivery attempt. |
@@ -44,7 +44,7 @@ The objective is to understand and demonstrate how an error-tracking SDK is desi
 | Transport | **`node:http` · `node:https`** | HTTP delivery without a third-party client. |
 | Event identity | **`node:crypto`** | Random event IDs and SHA-256 fingerprints. |
 | Tests | **`node:test` · `node:assert`** | Unit, HTTP integration, and child-process lifecycle tests. |
-| Automation | **GitHub Actions** | Test, demo, and package checks across Node 22, 24, and 26. |
+| Automation | **GitHub Actions** | Linux Node 22/24/26, Windows Node 24, package-consumer tests, Gitleaks, CodeQL, and npm security checks. |
 | Packaging | **npm · `tsc`** | Compiled JavaScript and TypeScript declarations. |
 
 **Runtime dependencies: 0.** TypeScript and Node typings are development dependencies only.
@@ -120,7 +120,8 @@ flowchart TD
   B -->|yes| C[Build event and snapshot context]
   B -->|no| X[Discard]
   C --> D[beforeSend hook]
-  D -->|event| E[Bounded queue]
+  D -->|event| V[Validate and redact event]
+  V --> E[Bounded queue]
   D -->|null| X
   E --> F[Send one HTTP batch]
   F -->|transient failure| G[Bounded backoff and retry]
@@ -133,10 +134,18 @@ The server counts each event ID once within its bounded deduplication window. Fi
 ### The reliability decisions
 
 - **Bound memory:** the default queue holds 100 events, including the active batch. Overflow drops the newest incoming event; each serialized event is limited to 16 KiB.
-- **Bound delivery work:** batches contain up to 20 events by default, with a 2-second request deadline and three retries after the initial attempt. Network errors, HTTP 408/429, and 5xx responses retry; other non-2xx responses drop immediately.
+- **Bound delivery work:** batches contain up to 20 events by default, with a 2-second request deadline and three retries after the initial attempt. A `Retry-After` beyond the configured wait budget stops retrying rather than sending early. Network errors, HTTP 408/429, and 5xx responses retry; other non-2xx responses drop immediately.
 - **Keep background work unobtrusive:** networking is asynchronous, and background timers/sockets do not keep a healthy process alive. Event building, serialization, and the synchronous user hook still consume CPU on the caller's thread.
-- **Make shutdown explicit:** with no other relevant host handler, a fatal error gets a delivery attempt of at most 2 seconds before exiting with code 1. Existing host handlers retain shutdown ownership. Set `globalHandlers: false` when a framework manages this lifecycle.
+- **Make shutdown explicit:** with no other relevant host handler, a fatal error gets a delivery attempt of at most 2 seconds before exiting with code 1. Host handlers registered before or after initialization retain shutdown ownership, including one-shot and prepended handlers. Once delegated, ownership stays with the host until reinitialization; removing its handler does not transfer lifecycle control back to the SDK. Set `globalHandlers: false` when a framework manages this lifecycle.
 - **Report delivery limits honestly:** this is an in-memory, best-effort transport. Exhausted retries, overflow, hard crashes, or abrupt exits can lose events. `flush()` returns `false` on a deadline or any transport-level loss since initialization.
+
+## Privacy defaults
+
+After `beforeSend`, tinytrace snapshots and validates the event, strips unknown fields, and redacts recognized credentials, bearer/basic authentication, private-key blocks, provider tokens, sensitive tag keys, email addresses, URL passwords, and home-directory usernames. It also recomputes the fingerprint from sanitized fields. Fatal SDK diagnostics contain no original error text.
+
+`redactEvent(event)` exposes the same helper and returns `null` for an invalid event. Automatic redaction is enabled by default; `redact: false` explicitly disables it. The hook receives the original event, so hook code itself must avoid logging sensitive input.
+
+These are pattern-based safeguards, not a guarantee that arbitrary personal data is detected. Add domain-specific filtering in `beforeSend`. Tags and breadcrumbs are process-wide; request isolation is outside v1.
 
 ## Project map
 
@@ -144,6 +153,7 @@ The server counts each event ID once within its bounded deduplication window. Fi
 | --- | --- |
 | [`src/index.ts`](src/index.ts) | Public API, context, global handlers, and client lifecycle. |
 | [`src/event.ts`](src/event.ts) | Event building, stack parsing, IDs, and fingerprints. |
+| [`src/privacy.ts`](src/privacy.ts) | Hook-output validation, schema snapshots, and default redaction. |
 | [`src/transport.ts`](src/transport.ts) | Queue, batching, HTTP requests, retry, and deadlines. |
 | [`src/server.ts`](src/server.ts) | Standalone loopback ingest server and grouping. |
 | [`src/types.ts`](src/types.ts) | Event schema, options, and shared bounds. |
@@ -157,18 +167,20 @@ The server counts each event ID once within its bounded deduplication window. Fi
 | Command | Purpose |
 | --- | --- |
 | `npm run build` | Compile TypeScript into `dist/` with declarations. |
-| `npm test` | Build and run the 19-test suite. |
+| `npm test` | Build and run the 36-test regression suite. |
+| `npm run check` | Tests, code-size guard, demo, and clean-consumer package/type checks. |
+| `npm run verify:package` | Install the packed tarball and exercise its HTTP API and declarations. |
 | `npm run demo` | Run the complete local capture-to-ingest flow. |
 | `npm run ingest` | Start the standalone ingest server on port 4318. |
 | `npm pack --dry-run` | Build and inspect the npm package contents. |
 
-The tests exercise context snapshots, stack parsing, sampling, hook failures, recursion, retry budgets, backoff, queue overflow, hanging/refused connections, ingest validation, deduplication, and process shutdown. Fatal cases run in child processes, including strict unhandled-rejection mode and applications with their own process handlers.
+The tests exercise context snapshots, stack parsing, sampling, hook failures, redaction across event fields, malformed payload rejection, retry budgets, real HTTP retry hints, queue overflow, hanging/refused connections, ingest validation, deduplication, and process shutdown. Lifecycle cases cover persistent, one-shot, and prepended host handlers before and after initialization, strict rejection mode, actual in-flight requests, bounded shutdown time, and repeated listener cleanup. Fatal cases run in child processes, including strict unhandled-rejection mode and applications with their own process handlers.
 
 See the [CI runs](https://github.com/garvj65/tinytrace/actions) and [validation notes](docs/VALIDATION.md) for verification details. Generated build output, `node_modules`, and package tarballs are excluded from Git; `npm run build` and `npm pack` reproduce them.
 
 ## Scope and release status
 
-The initial implementation covers the core SDK, transport, local ingest server, tests, demo, documentation, and CI configuration. The npm release is pending; the configured package name is **`@garvj65/tinytrace`**. For now, run from source or install a locally generated tarball using the [release guide](RELEASING.md).
+The v1 code includes the core SDK, transport, local ingest server, privacy and lifecycle hardening, regression tests, package-consumer checks, demo, documentation, and automated security gates. the configured package name is **`@garvj65/tinytrace`**. The [release workflow](.github/workflows/publish.yml) publishes after trusted main-branch CI succeeds and verifies the registry tarball integrity. Publication is complete only when `npm run verify:registry` confirms the released artifact. Run from source or install a locally generated tarball until then. See the [release guide](RELEASING.md), [changelog](CHANGELOG.md), and [security scope](SECURITY.md).
 
 Source maps, a UI, performance monitoring, framework adapters, and durable storage are outside the initial scope. A Sentry-compatible envelope adapter is a possible extension; the current local ingest format is not Sentry-compatible.
 

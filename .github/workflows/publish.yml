@@ -22,6 +22,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+      actions: read
       id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -32,6 +33,18 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+      - name: Require green CI for the exact release commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          node --input-type=module - <<'JS'
+          const url = 'https://api.github.com/repos/' + process.env.GITHUB_REPOSITORY + '/actions/runs?head_sha=' + process.env.RELEASE_SHA;
+          const response = await fetch(url, {headers:{Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json'}});
+          if (!response.ok) throw Error('Cannot verify CI: '+response.status);
+          const {workflow_runs:runs} = await response.json();
+          if (!runs.some(r => r.path === '.github/workflows/ci.yml' && r.head_sha === process.env.RELEASE_SHA && r.event === 'push' && r.conclusion === 'success' && r.head_repository.full_name === process.env.GITHUB_REPOSITORY)) throw Error('No successful trusted CI run for this exact commit');
+          JS
       - run: npm install --global npm@11.9.0 --ignore-scripts --no-audit --no-fund
       - run: npm ci --ignore-scripts
       - name: Check immutable version against npm
