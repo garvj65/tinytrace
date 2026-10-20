@@ -40,3 +40,5 @@ See npm's official [publishing guide](https://docs.npmjs.com/creating-and-publis
 Bump `package.json`, both root version fields in `package-lock.json`, and the fixed package/version allowlist in `scripts/verify-registry.mjs` together. Every published package artifact is immutable, including its packaged README and reference docs. A change to shipped content needs a new version before the next publish. Check the published version and integrity using `npm run verify:registry`; a green source CI run alone does not prove publication.
 
 For byte-for-byte registry integrity verification, use the release toolchain: Node 24 and npm 11.9.0. Text checkout and emitted JavaScript use LF on all platforms. A different packaging toolchain may produce different archive bytes even for equivalent source.
+
+The successful Linux Node 24 CI job retains the verified npm tarball as a GitHub Actions artifact for 14 days. Download it from the CI run's Artifacts section to install or inspect the exact candidate package without rebuilding.
