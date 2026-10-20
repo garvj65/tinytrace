@@ -7,7 +7,7 @@ export function text(value: unknown, max = 2048): string {
 export function parseStack(stack: string): Frame[] {
   return stack.slice(0, 16384).split('\n').slice(1, 33).flatMap(line => {
     const match = /^\s*at\s+(?:(.*?)\s+\()?(.+):(\d+):(\d+)\)?$/.exec(line);
-    return match ? [{ function: match[1], filename: match[2]!, lineno: +match[3]!, colno: +match[4]! }] : [];
+    return match ? [{ function: match[1]?.slice(0, 256), filename: match[2]!.slice(0, 2048), lineno: +match[3]!, colno: +match[4]! }] : [];
   });
 }
 export function buildEvent(value: unknown, error: boolean): TraceEvent {
@@ -20,8 +20,8 @@ export function buildEvent(value: unknown, error: boolean): TraceEvent {
       }
     } catch { /* A throwing getter must not escape into the application. */ }
   }
-  const signature = [error ? type : 'message', message,
-    ...frames.slice(0, 5).map(f => `${f.filename}:${f.function ?? ''}`)].join('\n');
+  const signature = JSON.stringify([error ? 'exception' : 'message', type, message,
+    frames.slice(0, 5).map(f => [f.filename, f.function ?? ''])]);
   return {
     event_id: randomUUID().replaceAll('-', ''), timestamp: new Date().toISOString(),
     platform: 'node', level: error ? 'error' : 'info', message, environment: 'development',

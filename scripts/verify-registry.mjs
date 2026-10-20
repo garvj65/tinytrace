@@ -1,0 +1,12 @@
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+const { name, version } = JSON.parse(readFileSync('package.json'));
+assert.equal(name, '@garvj65/tinytrace'); assert.equal(version, '1.0.0');
+const response = await fetch('https://registry.npmjs.org/%40garvj65%2Ftinytrace/1.0.0');
+assert.ok(response.ok, 'Published version is not available: ' + response.status);
+const published = await response.json();
+const [local] = JSON.parse(execFileSync(process.execPath, [process.env.npm_execpath, 'pack', '--json', '--ignore-scripts'], { encoding: 'utf8' }));
+assert.equal(published.name, name); assert.equal(published.version, version);
+assert.equal(published.dist.integrity, local.integrity, 'Registry tarball differs from the verified local package');
+console.log('Registry version and tarball integrity verified:', name, version);

@@ -1,13 +1,44 @@
-# Releasing tinytrace
+# Releasing tinytrace 1.0.0
 
-The current npm name is the provisional `@garvj65/tinytrace`. The unscoped `tinytrace` is already a different package. Confirm the scope is yours before publishing, or rename the package to your own npm scope.
+Package: **`@garvj65/tinytrace`**. Repository: [garvj65/tinytrace](https://github.com/garvj65/tinytrace). The unscoped `tinytrace` name belongs to another package. Verify npm-account ownership or publishing permission for the configured scope before releasing.
 
-1. Sign in locally with `npm login`, then check `npm whoami`. Never commit credentials or put a publishing token in the repository. Confirm publishing permission for the configured npm scope before releasing.
-2. If needed, run `npm pkg set name=@YOUR_NPM_USERNAME/tinytrace`, then `npm install --package-lock-only`. Update the README's name. Package metadata points to `https://github.com/garvj65/tinytrace`; retain that URL when publishing this repository.
-3. Run `npm ci`, `npm test`, and `npm run demo`. Inspect `npm pack --dry-run`, then run `npm pack` to generate the installable tarball. Build output, declarations, README, license, and the demo GIF should be present; tests and credentials should not.
-4. In a temporary empty directory, run `npm init -y` and `npm install /absolute/path/to/garvj65-tinytrace-0.1.0.tgz --ignore-scripts`. For a renamed package, use its actual generated tarball filename. Smoke-test `node --input-type=module -e 'import { captureMessage, close } from "@garvj65/tinytrace"; captureMessage("safe before init"); console.log(await close())'` with the final package name.
-5. Run `npm publish --access public --dry-run`, inspect it, then `npm publish --access public`. Complete npm's required account/2FA checks. Verify the published package with `npm view @garvj65/tinytrace version` and install it in a clean consumer directory.
+## What the automated release does
 
-For subsequent CI releases, configure npm trusted publishing for the actual repository and workflow and add a dedicated release workflow with `id-token: write`. Do not publish on every push. CI in this project only verifies code; it does not publish. npm's current requirements and setup are in its official [publishing guide](https://docs.npmjs.com/creating-and-publishing-scoped-public-packages/) and [trusted publishing guide](https://docs.npmjs.com/trusted-publishers/).
+[Publish npm](.github/workflows/publish.yml) runs after a successful trusted main-branch CI push, or can be started manually on main. It checks that CI passed for the exact checked-out commit, installs the lockfile with lifecycle scripts disabled, checks npm advisories and registry signatures, and publishes with provenance. The publish lifecycle runs the full tests, size guard, demo, and clean-consumer package/type checks before publishing.
 
-Optional next project: a separate Sentry envelope adapter. Check Sentry's current protocol documentation first and test it independently. The local `{ events: [...] }` format is intentionally not advertised as compatible with Sentry ingest.
+CI includes Linux Node 22/24/26, Windows Node 24, Gitleaks history scanning, and CodeQL security-extended queries. Test jobs never receive a publishing token. Release credentials are available only to the trusted publish job.
+
+An existing immutable npm version is not overwritten. The final step compares the registry tarball's SHA-512 integrity with a fresh local pack. A different artifact under the same version fails verification: increment the version rather than attempting to replace it.
+
+## Authenticate the first release
+
+The repository cannot infer npm account ownership from a GitHub username. Choose an authenticated publisher:
+
+- **GitHub release:** add a granular npm publishing token as the repository Actions secret `NPM_TOKEN`. It must authorize this package/scope and satisfy the npm account's 2FA policy. Do not paste the token into chat, files, workflow text, or commits. Run **Publish npm → Run workflow → main**, or rerun its failed publishing job after authentication is configured.
+- **Local first publish:** clone the verified main branch, run `npm ci`, `npm login`, `npm whoami`, `npm run check`, `npm audit --audit-level=low`, and `npm audit signatures`. Then run `npm publish --access public` followed by `npm run verify:registry`. Local publishing does not generate GitHub provenance.
+
+If the npm username differs from `garvj65`, update the package name, lockfile, README, and consumer-test import references before publishing, then run CI again.
+
+## Prefer OIDC for later releases
+
+After the package exists, configure its npm trusted publisher:
+
+| Field | Value |
+| --- | --- |
+| Organization/user | `garvj65` |
+| Repository | `tinytrace` |
+| Workflow filename | `publish.yml` |
+| Allowed action | Explicitly allow `npm publish` |
+| Environment | Leave empty; this workflow has no GitHub environment binding |
+
+The workflow uses Node 24 and npm 11.9.0, meeting npm's documented trusted-publishing requirements. Once OIDC publishing is verified, revoke/remove the bootstrap `NPM_TOKEN`. Never publish on untrusted pull-request events.
+
+See npm's official [publishing guide](https://docs.npmjs.com/creating-and-publishing-scoped-public-packages/) and [trusted-publisher guide](https://docs.npmjs.com/trusted-publishers/).
+
+## Version changes
+
+Bump `package.json`, both root version fields in `package-lock.json`, and the fixed package/version allowlist in `scripts/verify-registry.mjs` together. Every published package artifact is immutable, including its packaged README and reference docs. A change to shipped content needs a new version before the next publish. Check the published version and integrity using `npm run verify:registry`; a green source CI run alone does not prove publication.
+
+For byte-for-byte registry integrity verification, use the release toolchain: Node 24 and npm 11.9.0. Text checkout and emitted JavaScript use LF on all platforms. A different packaging toolchain may produce different archive bytes even for equivalent source.
+
+The successful Linux Node 24 CI job retains the verified npm tarball as a GitHub Actions artifact for 14 days. Download it from the CI run's Artifacts section to install or inspect the exact candidate package without rebuilding.

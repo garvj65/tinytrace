@@ -1,20 +1,86 @@
 name: CI
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         node: [22, 24, 26]
+        include:
+          - os: windows-latest
+            node: 24
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-      - run: npm ci
-      - run: npm test
-      - run: npm run demo
-      - run: npm pack --dry-run
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - name: Retain verified npm tarball
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 24
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tinytrace-package-${{ github.sha }}
+          path: garvj65-tinytrace-1.0.0.tgz
+          if-no-files-found: error
+          retention-days: 14
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: 8.24.3
+          GITLEAKS_ENABLE_COMMENTS: false
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
+      - name: Scan all reachable Git history
+        run: gitleaks detect --redact --log-opts="--all" --exit-code=1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm audit --audit-level=low
+      - run: npm audit signatures
+  codeql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+      security-events: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          queries: security-extended
+      - uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
+        with:
+          upload: false
+          output: codeql-results
+      - name: Fail on CodeQL findings
+        run: |
+          node --input-type=module - <<'JS'
+          import { readdirSync, readFileSync } from 'node:fs';
+          const findings = readdirSync('codeql-results').filter(f => f.endsWith('.sarif')).flatMap(f => JSON.parse(readFileSync('codeql-results/' + f)).runs.flatMap(r => r.results ?? []));
+          console.log('CodeQL findings:', findings.length);
+          for (const finding of findings) console.log(finding.ruleId, finding.locations?.[0]?.physicalLocation?.artifactLocation?.uri);
+          if (findings.length) process.exit(1);
+          JS

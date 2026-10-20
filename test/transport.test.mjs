@@ -22,7 +22,7 @@ test('batches and retries HTTP failures with stable IDs, exponential backoff, an
   const limited = transport(t, endpoint, { maxDelay: 300 }); const waits = []; let calls = 0;
   limited.post = async () => ({ status: ++calls === 1 ? 429 : 200, retryAfter: 1000 });
   limited.delay = async ms => { waits.push(ms); }; limited.enqueue(event());
-  assert.equal(await limited.flush(), true); assert.deepEqual(waits, [300]);
+  assert.equal(await limited.flush(), false); assert.deepEqual(waits, []); assert.equal(calls, 1);
 });
 test('permanent 400 is dropped once; retry budget is finite; overflow drops newest', async t => {
   let calls = 0;
@@ -63,4 +63,24 @@ test('background interval sends partial batches without an explicit flush', asyn
   const tx = transport(t, endpoint, { flushInterval: 5 }); tx.enqueue(event());
   await Promise.race([done, new Promise((_, reject) => { const timer = setTimeout(() => reject(Error('no delivery')), 1000); timer.unref(); })]);
   assert.equal(await tx.flush(), true);
+});
+
+test('real HTTP Retry-After seconds are honored and dates beyond budget stop retries', async t => {
+  let calls = 0; const times = [];
+  const endpoint = await listen(t, (_req, res) => {
+    times.push(performance.now()); res.writeHead(++calls === 1 ? 429 : 202, calls === 1 ? { 'retry-after': '1' } : {}); res.end();
+  });
+  const tx = transport(t, endpoint, { maxDelay: 2000 }); tx.enqueue(event());
+  assert.equal(await tx.flush(4000), true); assert.equal(calls, 2); assert.ok(times[1] - times[0] >= 950);
+  let datedCalls = 0;
+  const dated = await listen(t, (_req, res) => { datedCalls++; res.writeHead(503, { 'retry-after': new Date(Date.now() + 60000).toUTCString() }); res.end(); });
+  const overBudget = transport(t, dated, { maxDelay: 10 }); overBudget.enqueue(event());
+  assert.equal(await overBudget.flush(), false); assert.equal(datedCalls, 1);
+});
+
+test('unrepresentably long Retry-After is not treated as an immediate retry', async t => {
+  let calls = 0;
+  const endpoint = await listen(t, (_req, res) => { calls++; res.writeHead(429, { 'retry-after': '9'.repeat(400) }); res.end(); });
+  const tx = transport(t, endpoint); tx.enqueue(event());
+  assert.equal(await tx.flush(), false); assert.equal(calls, 1);
 });
