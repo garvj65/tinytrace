@@ -19,6 +19,7 @@ export interface Options {
   sampleRate?: number;
   beforeSend?: (event: TraceEvent) => TraceEvent | null;
   globalHandlers?: boolean;
+  redact?: boolean;
   shutdownTimeout?: number;
   batchSize?: number;
   maxQueue?: number;

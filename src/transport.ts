@@ -55,8 +55,9 @@ export class Transport {
         const { status, retryAfter } = await this.post(body);
         if (status >= 200 && status < 300) { delivered = true; break; }
         if (!(status === 0 || status === 408 || status === 429 || status >= 500) || attempt === this.retries) break;
-        const backoff = this.base * 2 ** attempt * (0.8 + Math.random() * 0.4);
-        await this.delay(Math.min(this.cap, Math.max(backoff, retryAfter)));
+        if (retryAfter > this.cap) break; // Never retry earlier than a server's requested wait.
+        const backoff = Math.min(this.cap, this.base * 2 ** attempt * (0.8 + Math.random() * 0.4));
+        await this.delay(Math.max(backoff, retryAfter));
       }
       if (!this.stopped) { if (delivered) this.sent += this.active.length; else this.dropped += this.active.length; }
     } catch { if (!this.stopped) this.dropped += this.active.length; }
@@ -90,7 +91,7 @@ export class Transport {
         }, res => {
           const hint = res.headers['retry-after'];
           const raw = typeof hint === 'string' ? hint : '';
-          const retryAfter = raw ? (Number.isFinite(+raw) ? +raw * 1000 : Date.parse(raw) - Date.now()) : 0;
+          const retryAfter = raw ? (/^\d+$/.test(raw) ? +raw * 1000 : Date.parse(raw) - Date.now()) : 0;
           res.on('error', () => done());
           res.on('end', () => done(res.statusCode, Number.isFinite(retryAfter) ? Math.max(0, retryAfter) : 0));
           res.resume();
