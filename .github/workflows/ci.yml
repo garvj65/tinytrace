@@ -46,6 +46,8 @@ jobs:
           GITLEAKS_VERSION: 8.24.3
           GITLEAKS_ENABLE_COMMENTS: false
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
+      - name: Scan all reachable Git history
+        run: gitleaks detect --redact --log-opts="--all" --exit-code=1
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
