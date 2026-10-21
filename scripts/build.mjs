@@ -1,0 +1,10 @@
+import { execFileSync } from 'node:child_process';
+import { writeFileSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
+const tsc = 'node_modules/typescript/bin/tsc';
+rmSync('dist', { recursive: true, force: true }); rmSync('dist-cjs', { recursive: true, force: true });
+execFileSync(process.execPath, [tsc, '-p', 'tsconfig.json'], { stdio: 'inherit' });
+execFileSync(process.execPath, [tsc, '-p', 'tsconfig.cjs.json'], { stdio: 'inherit' });
+writeFileSync('dist-cjs/package.json', '{"type":"commonjs"}\n');
+const sdk = createRequire(import.meta.url)('../dist-cjs/index.js');
+writeFileSync('dist/index.js', "import sdk from '../dist-cjs/index.js';\nexport const { " + Object.keys(sdk).join(', ') + ' } = sdk;\n');

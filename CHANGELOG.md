@@ -1,12 +1,20 @@
 # Changelog
 
-## 1.0.0 — prepared release
+## 2.0.0 — 2026-10-21
 
-- Core TypeScript SDK, local grouped ingest server, bounded batching and retry, context, sampling, and hooks.
-- Stable host shutdown ownership across handler registration order, one-shot listeners, and prepended listeners.
-- Default pattern-based redaction, generic fatal diagnostics, schema validation, and immutable event snapshots.
-- Respect server retry hints; stop retries when the requested wait exceeds the configured budget.
-- Expanded lifecycle/privacy/real-HTTP regressions, Linux and Windows CI, clean-consumer ESM/declaration checks, and an enforced sub-800-line code budget.
-- Pinned actions, history secret scanning, CodeQL, npm advisory/signature checks, and a gated npm release with provenance and registry-integrity verification.
+- Add opt-in private Node disk and browser IndexedDB outboxes, persistence barriers, startup replay, stable retry IDs, retention/capacity controls, and delivery counters.
+- Retain exhausted transient failures for later durable cycles and preserve written Retry-After deadlines across restart. Fail closed on storage ownership, destination, or initialization errors.
+- Add isolated Node AsyncLocalStorage scopes and explicit async browser scopes, with inherited bounded context.
+- Add domain-specific literal/key/path redaction and tag allowlists before storage/delivery; validate sanitized payloads and recovered records.
+- Add a browser-safe ESM entry, automatic browser errors/rejections, and tested Express 5/native HTTP integration.
+- Add explicitly registered flat v3 source maps, nested async/request spans, error correlation, separate transaction hooks/sampling, and basic Sentry envelopes.
+- Add CommonJS with shared ESM client identity, clean package/type consumers, hard-kill recovery tests, and real Chromium reload/ownership checks.
+- Make release verification version-independent and tolerant of npm propagation delays. Expand the code budget to match the authorized v2 scope.
 
-Publication is complete only when the configured npm registry version exists and `npm run verify:registry` confirms its artifact.
+Migration: fingerprints change; persistent mode is opt-in; browser async code uses explicit scopes; beforeSendTransaction is separate from beforeSend. See RELEASING.md and docs/SDK.md for guarantees and limits.
+
+## 1.0.0 — 2026-10-21
+
+- Publish the zero-runtime-dependency Node SDK with manual/automatic capture, stack parsing, tags, breadcrumbs, sampling, hooks, default redaction, schema validation, bounded batching/retry, and explicit lifecycle APIs.
+- Include a local grouping/dedup ingest server, demo GIF, 39 regressions, Linux/Windows CI, Gitleaks, CodeQL, dependency checks, and verified npm provenance/integrity.
+- Complete the original 789-line educational milestone with host-owned shutdown and long Retry-After correctness fixes.

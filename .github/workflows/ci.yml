@@ -29,9 +29,22 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: tinytrace-package-${{ github.sha }}
-          path: garvj65-tinytrace-1.0.0.tgz
+          path: garvj65-tinytrace-*.tgz
           if-no-files-found: error
           retention-days: 14
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
   security:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -84,3 +97,4 @@ jobs:
           for (const finding of findings) console.log(finding.ruleId, finding.locations?.[0]?.physicalLocation?.artifactLocation?.uri);
           if (findings.length) process.exit(1);
           JS
+
