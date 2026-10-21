@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.2 — 2026-10-21
+
+- Finalize the README with project completion status, local receiver setup, API overview, lifecycle guidance, and an explicit guarantees/limitations table.
+- Correct the source-map/protocol reference link and explain that registry integrity verification requires the exact release checkout.
+- Keep the example persistent outbox outside the repository and align npm metadata with Node/browser support. SDK behavior is unchanged.
+
 ## 2.0.1 — 2026-10-21
 
 - Truncate long headerless browser stacks to 32 frames instead of rejecting them.

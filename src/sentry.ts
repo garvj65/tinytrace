@@ -23,7 +23,7 @@ export function toSentryEvent(event: TraceEvent): Record<string, unknown> {
     event_id: event.event_id, timestamp: Date.parse(event.timestamp) / 1000, platform: event.platform,
     level: event.level, message: event.message, environment: event.environment, release: event.release,
     tags: event.tags, fingerprint: [event.fingerprint],
-    sdk: { name: 'tinytrace.javascript', version: '2.0.1' },
+    sdk: { name: 'tinytrace.javascript', version: '2.0.2' },
     breadcrumbs: { values: event.breadcrumbs.map(c => ({ ...c, timestamp: Date.parse(c.timestamp) / 1000 })) },
     ...(ex ? { exception: { values: [{ type: ex.type, value: ex.value,
       mechanism: { type: event.mechanism ?? 'manual', handled: event.mechanism === 'manual' },
