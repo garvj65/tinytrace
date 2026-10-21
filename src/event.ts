@@ -9,7 +9,7 @@ export function parseStack(stack: string): Frame[] {
     const match = /^\s*at\s+(?:(.*?)\s+\()?(.+):(\d+):(\d+)\)?$/.exec(line)
       ?? /^(.*?)@(.+):(\d+):(\d+)$/.exec(line);
     return match ? [{ function: match[1]?.slice(0, 256), filename: match[2]!.slice(0, 2048), lineno: +match[3]!, colno: +match[4]! }] : [];
-  });
+  }).slice(0, 32);
 }
 export function buildEvent(value: unknown, error: boolean): TraceEvent {
   let type = 'Error', message = text(value), frames: Frame[] = [];

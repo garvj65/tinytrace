@@ -112,3 +112,8 @@ test('HTTP 500 without an exception and explicit semantic failures mark spans as
   await sdk.startSpan({ name: 'semantic failure' }, scope => { scope.setSpanStatus('error'); return 42; });
   assert.equal(await sdk.flush(), true); assert.equal(events.length, 2); assert.ok(events.every(e => e.spans.at(-1).status === 'error'));
 });
+
+test('headerless browser stacks truncate to 32 frames instead of dropping the event', () => {
+  const frames = parseStack(Array.from({length: 40}, (_, i) => 'fn@https://app.test/bundle.js:' + (i+1) + ':1').join('\n'));
+  assert.equal(frames.length, 32); assert.equal(frames[31].lineno, 32);
+});

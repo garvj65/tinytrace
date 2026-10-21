@@ -17,7 +17,8 @@ jobs:
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.event == 'push' &&
        github.event.workflow_run.head_repository.full_name == github.repository &&
-       github.event.workflow_run.head_branch == 'main')
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_sha == github.sha)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -43,6 +44,8 @@ jobs:
           const url = 'https://api.github.com/repos/' + process.env.GITHUB_REPOSITORY + '/actions/runs?head_sha=' + process.env.RELEASE_SHA;
           const response = await fetch(url, {headers:{Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json'}});
           if (!response.ok) throw Error('Cannot verify CI: '+response.status);
+          const latest = await fetch('https://api.github.com/repos/' + process.env.GITHUB_REPOSITORY + '/commits/main', {headers:{Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json'}});
+          if (!latest.ok || (await latest.json()).sha !== process.env.RELEASE_SHA) throw Error('Release commit is no longer the main head');
           const {workflow_runs:runs} = await response.json();
           if (!runs.some(r => r.path === '.github/workflows/ci.yml' && r.head_sha === process.env.RELEASE_SHA && r.event === 'push' && r.conclusion === 'success' && r.head_repository.full_name === process.env.GITHUB_REPOSITORY)) throw Error('No successful trusted CI run for this exact commit');
           JS
@@ -68,3 +71,4 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Verify registry release
         run: npm run verify:registry
+
