@@ -41,6 +41,7 @@ export class ScopeClient {
   }
   captureException(error: unknown): string | undefined { return this.capture(error, true); }
   captureMessage(message: string): string | undefined { return this.capture(message, false); }
+  setSpanStatus(status: 'ok' | 'error'): void { if (this.scope().trace) this.scope().failed = status === 'error'; }
   async captureExceptionAsync(error: unknown): Promise<string | undefined> {
     const id = this.captureException(error); return id && await this.persist() ? id : undefined;
   }
@@ -88,7 +89,10 @@ export class ScopeClient {
         if (scope.failed) span.status = 'error';
         span.timestamp = span.start_timestamp + Math.max(0, performance.now() - started) / 1000;
         if (scope.spans.length < 99 || root) scope.spans.push(span);
-        if (root) child.capture(span.name, false, 'manual', { type: 'transaction', trace, spans: scope.spans.slice(0, 100) });
+        if (root) {
+          child.capture(span.name, false, 'manual', { type: 'transaction', trace, spans: scope.spans.slice(0, 100) });
+          scope.captured.clear(); scope.spans.length = 0;
+        }
       }
     });
   }

@@ -43,7 +43,7 @@ export abstract class DeliveryQueue {
       for (const record of records) {
         let event: TraceEvent | null = null;
         try { event = prepareEvent(JSON.parse(record.body), options.redact !== false, options.redaction); } catch {}
-        if (!event) { await store.remove(record.id); this.dropped++; continue; }
+        if (!event || event.event_id !== record.id) { await store.remove(record.id); this.dropped++; continue; }
         const sanitized = JSON.stringify(event);
         if (sanitized !== record.body) { record.body = sanitized; await store.put(record); }
         if (!this.stopped) this.queue.push(record);

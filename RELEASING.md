@@ -11,7 +11,7 @@ The package is `@garvj65/tinytrace`. Version 1.0.0 is the initial published SDK;
 5. Publishing runs package-consumer tests, attaches public provenance, and verifies the registry name/version and SHA-512 tarball integrity against a deterministic local pack. Registry propagation is polled for up to roughly four minutes plus request timeouts.
 6. Inspect the successful release run and npm page. An existing immutable version is skipped and still integrity-verified. A different artifact with the same version fails verification; it must not be overwritten.
 
-Only package.json/lockfile version fields need updating for future versions; registry verification and artifact names are version-independent. The verified tarball is retained as a main CI artifact for 14 days. README/package bytes are part of the immutable artifact: changing them without a version bump means the current tree will no longer reproduce the previous tarball.
+The verifier reads validated stable-version metadata from npm run. Only package.json/lockfile version fields need updating for future stable versions; registry verification and artifact names are version-independent. The verified tarball is retained as a main CI artifact for 14 days. README/package bytes are part of the immutable artifact: changing them without a version bump means the current tree will no longer reproduce the previous tarball.
 
 ## Publishing authentication
 

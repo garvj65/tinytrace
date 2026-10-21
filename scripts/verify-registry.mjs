@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
-const { name, version } = JSON.parse(readFileSync('package.json'));
+const name = process.env.npm_package_name, version = process.env.npm_package_version;
 assert.equal(name, '@garvj65/tinytrace');
-const url = 'https://registry.npmjs.org/' + encodeURIComponent(name) + '/' + encodeURIComponent(version);
+assert.ok(typeof version === 'string' && version.length <= 32 && /^\d+\.\d+\.\d+$/.test(version), 'Run through npm with a stable semantic version');
+const url = 'https://registry.npmjs.org/%40garvj65%2Ftinytrace/' + version;
 let published;
 for (let attempt = 0; attempt < 24; attempt++) {
   try {

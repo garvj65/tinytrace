@@ -1,7 +1,8 @@
 import type { TraceEvent } from './types.js';
+import { byteLength } from './utils.js';
 export interface RawSourceMap { version: 3; sources: string[]; names?: string[]; mappings: string; sourceRoot?: string }
 interface Entry { column: number; source: number; line: number; originalColumn: number; name?: number }
-const maps = new Map<string, { raw: RawSourceMap; lines: Entry[][] }>();
+const maps = new Map<string, { raw: RawSourceMap; lines: Entry[][]; size: number; units: number }>();
 const digits = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 function decode(segment: string): number[] {
   const values: number[] = []; let value = 0, shift = 0;
@@ -17,12 +18,13 @@ function decode(segment: string): number[] {
 }
 export function registerSourceMap(filename: string, input: RawSourceMap): boolean {
   try {
-    if (filename.length > 2048 || JSON.stringify(input).length > 1048576) return false;
+    if (filename.length > 2048 || byteLength(JSON.stringify(input)) > 1048576) return false;
     const raw = JSON.parse(JSON.stringify(input)) as RawSourceMap;
     if (raw.version !== 3 || typeof raw.mappings !== 'string' || !Array.isArray(raw.sources)
       || !raw.sources.every(s => typeof s === 'string' && s.length <= 2048)
       || (raw.names && (!Array.isArray(raw.names) || !raw.names.every(n => typeof n === 'string' && n.length <= 256)))
       || (raw.sourceRoot !== undefined && (typeof raw.sourceRoot !== 'string' || raw.sourceRoot.length > 2048))) return false;
+    if ((raw.mappings.match(/;/g)?.length ?? 0) >= 100000) return false;
     let source = 0, originalLine = 0, originalColumn = 0, name = 0, segments = 0;
     const lines = raw.mappings.split(';').map(line => {
       let column = 0; const entries: Entry[] = [];
@@ -35,15 +37,18 @@ export function registerSourceMap(filename: string, input: RawSourceMap): boolea
         if (column < 0 || (entries.length && column < entries.at(-1)!.column)) throw Error('Unsorted mapping');
         if (v.length === 1) { entries.push({ column, source: -1, line: 0, originalColumn: 0 }); continue; }
         source += v[1]!; originalLine += v[2]!; originalColumn += v[3]!;
-        if (!raw.sources[source] || originalLine < 0 || originalColumn < 0) throw Error('Invalid origin');
+        if (raw.sources[source] === undefined || originalLine < 0 || originalColumn < 0) throw Error('Invalid origin');
         const entry: Entry = { column, source, line: originalLine, originalColumn };
-        if (v.length === 5) { name += v[4]!; if (!raw.names?.[name]) throw Error('Invalid name'); entry.name = name; }
+        if (v.length === 5) { name += v[4]!; if (raw.names?.[name] === undefined) throw Error('Invalid name'); entry.name = name; }
         entries.push(entry);
       }
       return entries;
     });
-    if (!maps.has(filename) && maps.size >= 100) maps.delete(maps.keys().next().value!);
-    maps.set(filename, { raw, lines }); return true;
+    const size = byteLength(JSON.stringify(raw)), units = segments + lines.length;
+    maps.delete(filename);
+    while (maps.size && (maps.size >= 100 || [...maps.values()].reduce((sum, m) => sum + m.size, size) > 8388608
+      || [...maps.values()].reduce((sum, m) => sum + m.units, units) > 200000)) maps.delete(maps.keys().next().value!);
+    maps.set(filename, { raw, lines, size, units }); return true;
   } catch { return false; }
 }
 export function clearSourceMaps(): void { maps.clear(); }

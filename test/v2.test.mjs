@@ -101,3 +101,14 @@ test('Sentry transport sends one UTF-8 sized event per authenticated envelope', 
   const exception = parsed.find(x => x.i.type === 'event').p; assert.equal(exception.exception.values[0].stacktrace.frames[0].filename, 'two.js');
   const tx = parsed.find(x => x.i.type === 'transaction').p; assert.equal(tx.spans.length, 1); assert.ok(tx.start_timestamp <= tx.timestamp); assert.equal(tx.contexts.trace.trace_id, tx.spans[0].trace_id);
 });
+test('invalid transaction hook output is discarded without poisoning valid messages', async t => {
+  const events = await capture(t, { beforeSendTransaction: event => ({ ...event, spans: [] }) });
+  await sdk.startSpan({ name: 'invalid-root' }, () => {}); sdk.captureMessage('valid message');
+  assert.equal(await sdk.flush(), true); assert.equal(events.length, 1); assert.equal(events[0].message, 'valid message');
+});
+test('HTTP 500 without an exception and explicit semantic failures mark spans as errors', async t => {
+  const events = await capture(t), endpoint = await listen(t, createServer(httpHandler((_req, res) => { res.statusCode = 500; res.end('failed'); })));
+  const response = await fetch(endpoint); await response.text();
+  await sdk.startSpan({ name: 'semantic failure' }, scope => { scope.setSpanStatus('error'); return 42; });
+  assert.equal(await sdk.flush(), true); assert.equal(events.length, 2); assert.ok(events.every(e => e.spans.at(-1).status === 'error'));
+});

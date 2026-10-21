@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { once } from 'node:events';
 import { chromium } from 'playwright';
 const events = [], envelopes = [], cookies = [];
+const assets = new Map(await Promise.all((await readdir('dist')).filter(name => name.endsWith('.js'))
+  .map(async name => ['/dist/' + name, await readFile('dist/' + name)])));
 let offline = false;
 const server = createServer(async (req, res) => {
   try {
     if (req.url === '/') { res.setHeader('content-type', 'text/html'); res.end('<!doctype html><title>tinytrace browser verification</title><script type="module">window.trace=await import("/dist/browser.js");</script>'); return; }
-    if (/^\/dist\/[a-z-]+\.js$/.test(req.url)) { res.setHeader('content-type', 'text/javascript'); res.end(await readFile('.' + req.url)); return; }
+    if (assets.has(req.url)) { res.setHeader('content-type', 'text/javascript'); res.end(assets.get(req.url)); return; }
     if (req.method === 'POST') {
       let raw = ''; for await (const chunk of req) raw += chunk;
       cookies.push(req.headers.cookie);
@@ -35,6 +37,12 @@ try {
     await trace.startSpan({ name: 'browser-work' }, async scoped => { await scoped.startSpan({ name: 'child' }, current => { current.captureMessage('inside child'); }); });
     if (!await trace.flush()) throw Error('Browser flush failed');
   });
+  await page.evaluate(async () => {
+    trace.registerSourceMap('bundle.js', { version: 3, sources: ['original.ts'], names: ['original'], mappings: 'AAAAA' });
+    const error = Error('browser mapped'); error.stack = 'Error: browser mapped\n at x (bundle.js:1:1)';
+    trace.captureException(error); await trace.flush(); trace.clearSourceMaps();
+  });
+  assert.equal(events.find(e => e.message === 'browser mapped').exception.frames[0].filename, 'original.ts');
   for (const name of ['alpha', 'beta']) {
     const event = events.find(e => e.message.startsWith(name)); assert.equal(event.tags.request, name); assert.equal(event.platform, 'javascript');
     assert.deepEqual(event.breadcrumbs.map(c => c.message), [name]); assert.equal(event.tags.customer_id, '[Redacted]');

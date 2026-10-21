@@ -22,6 +22,7 @@ The SDK has no runtime dependencies. Node HTTP, async context, and filesystem co
 | `addBreadcrumb(string \| {message, category?}): void` | Append a timestamped breadcrumb; retain the latest 20. |
 | `withScope(callback, initial?): T` | Clone context and return the callback's result unchanged. Optional initial tags/breadcrumbs are bounded. Node global API calls follow the async scope. Browser callbacks receive an explicit scoped client. |
 | `startSpan({name, op?}, callback): Promise<T>` | Run async work in a child trace scope. The callback receives a scoped client. Nested spans share a trace; a root emits one bounded transaction. A callback rejection is captured once per trace and rethrown. |
+| `scope.setSpanStatus('ok' \| 'error'): void` | Mark a semantic failure on the active span; HTTP integration marks 5xx and aborted responses. |
 | `persist(): Promise<boolean>` | Wait for recovery and writes queued by this point. False on storage failure. Without persistent storage it is a no-op success, not a disk guarantee. |
 | `flush(timeout=2000): Promise<boolean>` | Attempt immediate delivery of eligible events and wait up to the deadline. False on timeout or any delivery/storage loss since init. Deferred retry hints are not bypassed. |
 | `close(timeout=2000): Promise<boolean>` | Detach SDK handlers, flush, cancel networking, finish accepted writes, and release storage ownership. Persistent unacknowledged data is retained. Filesystem cleanup can outlast the network deadline. |
@@ -99,7 +100,7 @@ Pattern/literal rules do not discover arbitrary sensitive data. Hooks receive un
 
 ## Source maps and protocol references
 
-The bounded registry holds at most 100 flat v3 maps, each at most 1 MiB and 100000 mapping segments. It decodes base64 VLQ deltas, maps one-based stack positions to original positions, respects unmapped segments, and uses optional original function names. It does not fetch map/source URLs, read arbitrary files, execute source content, or handle indexed maps. Node's --enable-source-maps also works because parsing uses Node's resulting stack string.
+The bounded registry holds at most 100 flat v3 maps, each at most 1 MiB, 100000 mapping segments, and 100000 generated lines; aggregate raw JSON is bounded to 8 MiB and decoded lines/segments to 200000. It decodes base64 VLQ deltas, maps one-based stack positions to original positions, respects unmapped segments, and uses optional original function names. It does not fetch map/source URLs, read arbitrary files, execute source content, or handle indexed maps. Node's --enable-source-maps also works because parsing uses Node's resulting stack string.
 
 The Sentry adapter uses numeric epoch-second timestamps, exception.values, oldest-first frames, breadcrumbs.values, fingerprint arrays, trace contexts, and transaction/span fields. Envelopes contain an event ID, public DSN, sent_at, an item type, exact UTF-8 payload length, and newline-delimited JSON. Browser requests use text/plain with the self-authenticated envelope and omit credentials. This requires a Sentry/Relay version that supports envelope-header authentication (Relay 21.6+). There is no live-account ingestion assertion, server-side source-map upload, sessions, attachments, profiling, complete Sentry SDK compatibility, or Sentry-specific quota-category management.
 

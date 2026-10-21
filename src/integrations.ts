@@ -11,6 +11,7 @@ export function requestHandler() {
         return new Promise<void>(resolve => {
           const done = () => {
             res.off('finish', done); res.off('close', done);
+            if (res.statusCode >= 500 || !res.writableFinished) current.setSpanStatus('error');
             current.setTag('http.status_code', String(res.statusCode)); resolve();
           };
           res.once('finish', done); res.once('close', done);

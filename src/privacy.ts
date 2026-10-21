@@ -49,6 +49,9 @@ export function prepareEvent(value: unknown, redact = true, rules: RedactionOpti
         && obj(s) && str(s.name, 256) && str(s.op, 64) && ['ok', 'error'].includes(String(s.status))
         && typeof s.start_timestamp === 'number' && Number.isFinite(s.start_timestamp) && s.start_timestamp >= 0
         && typeof s.timestamp === 'number' && Number.isFinite(s.timestamp) && s.timestamp >= s.start_timestamp)))) return null;
+    if (e.spans !== undefined && (e.type !== 'transaction' || !e.trace || e.spans.some(s => s.trace_id !== (e.trace as Record<string, unknown>).trace_id)
+      || new Set(e.spans.map(s => s.span_id)).size !== e.spans.length)) return null;
+    if (e.type === 'transaction' && (!e.spans || !e.spans.some(s => s.span_id === (e.trace as Record<string, unknown>).span_id))) return null;
     const ex = e.exception;
     if (ex !== undefined && (!obj(ex) || !str(ex.type, 128) || !str(ex.value, 2048)
       || !Array.isArray(ex.frames) || ex.frames.length > 32 || !ex.frames.every(f => obj(f)
