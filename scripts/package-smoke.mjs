@@ -16,12 +16,12 @@ try {
   assert.equal(Object.keys(lock.packages).length, 2);
   writeFileSync(join(consumer, 'smoke.mjs'), `import assert from 'node:assert/strict';
     import { createServer } from 'node:http'; import { once } from 'node:events';
-    import { init, captureException, close } from '@garvj65/tinytrace';
+    import { init, captureException, close, toSentryEvent } from '@garvj65/tinytrace';
     const events=[], server=createServer(async(req,res)=>{let raw='';for await(const chunk of req)raw+=chunk;events.push(...JSON.parse(raw).events);res.end();});
     server.listen(0,'127.0.0.1'); await once(server,'listening');
     init({endpoint:'http://127.0.0.1:'+server.address().port+'/events',globalHandlers:false});
     captureException(Error('password=private-value')); assert.equal(await close(),true);
-    assert.equal(events.length,1); assert.doesNotMatch(JSON.stringify(events),/private-value/);
+    assert.equal(events.length,1); assert.equal(toSentryEvent(events[0]).sdk.version, ${JSON.stringify(pack.version)}); assert.doesNotMatch(JSON.stringify(events),/private-value/);
     await new Promise(r=>server.close(r)); console.log('Installed package HTTP/redaction smoke: PASS');`);
   process.stdout.write(execFileSync(process.execPath, ['smoke.mjs'], { cwd: consumer, encoding: 'utf8' }));
   writeFileSync(join(consumer, 'consumer.ts'), "import {init,redactEvent,type Options} from '@garvj65/tinytrace'; const options:Options={endpoint:'http://localhost/events',redact:true}; init(options); redactEvent({});\n// @ts-expect-error redact is boolean\nconst bad:Options={endpoint:'http://localhost/events',redact:'yes'};\n");

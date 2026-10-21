@@ -1,17 +1,17 @@
 # Releasing tinytrace
 
-The package is `@garvj65/tinytrace`. Version 1.0.0 is the initial published SDK; version 2.0.0 is the final operational/platform expansion. npm versions are immutable.
+The package is `@garvj65/tinytrace`. Version 1.0.0 is the initial published SDK; the 2.x series is the final operational/platform expansion. npm versions are immutable.
 
 ## Release process
 
-1. Update version in package.json and both root version fields in package-lock.json. Add changelog/migration notes.
+1. Update version in package.json, both root version fields in package-lock.json, and the SDK metadata version in src/sentry.ts (package-consumer tests enforce agreement). Add changelog/migration notes.
 2. Run npm ci --ignore-scripts, npm run check, npm run test:browser, npm audit --audit-level=low, and npm audit signatures. Install the pinned Playwright Chromium binary first if needed.
 3. Open a PR and inspect the exact changed runtime paths, package exports, persistence/privacy contracts, docs, and CI results. The main-branch CI matrix includes browser, security, and CodeQL jobs.
 4. Merge only after those checks succeed. Publish npm runs after trusted main-branch push CI succeeds and checks the exact release SHA again. The workflow uses Node 24 and npm 11.9.0, LF output, and an uncached release install.
 5. Publishing runs package-consumer tests, attaches public provenance, and verifies the registry name/version and SHA-512 tarball integrity against a deterministic local pack. Registry propagation is polled for up to roughly four minutes plus request timeouts.
 6. Inspect the successful release run and npm page. An existing immutable version is skipped and still integrity-verified. A different artifact with the same version fails verification; it must not be overwritten.
 
-The verifier reads validated stable-version metadata from npm run. Only package.json/lockfile version fields need updating for future stable versions; registry verification and artifact names are version-independent. The verified tarball is retained as a main CI artifact for 14 days. README/package bytes are part of the immutable artifact: changing them without a version bump means the current tree will no longer reproduce the previous tarball.
+The verifier reads validated stable-version metadata from npm run. Package and SDK metadata versions must agree for future stable versions; registry verification and artifact names are version-independent. The verified tarball is retained as a main CI artifact for 14 days. README/package bytes are part of the immutable artifact: changing them without a version bump means the current tree will no longer reproduce the previous tarball.
 
 ## Publishing authentication
 

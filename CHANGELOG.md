@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.1 — 2026-10-21
+
+- Truncate long headerless browser stacks to 32 frames instead of rejecting them.
+- Require the current main commit for release automation, preventing stale successful CI from publishing after main moves.
+- Verify SDK protocol metadata matches the installed package version.
+
 ## 2.0.0 — 2026-10-21
 
 - Add opt-in private Node disk and browser IndexedDB outboxes, persistence barriers, startup replay, stable retry IDs, retention/capacity controls, and delivery counters.
