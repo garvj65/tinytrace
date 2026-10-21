@@ -2,7 +2,7 @@
 
 # tinytrace
 
-**Capture errors. Keep context private. Carry events through outages.**
+**Capture errors. Preserve context. Retry delivery.**
 
 A zero-runtime-dependency TypeScript error-tracking SDK for Node.js and browsers.
 
@@ -13,7 +13,7 @@ A zero-runtime-dependency TypeScript error-tracking SDK for Node.js and browsers
 ![Dependencies](https://img.shields.io/badge/Runtime_dependencies-0-14B8A6?style=flat-square)
 [![MIT](https://img.shields.io/badge/License-MIT-A78BFA?style=flat-square)](LICENSE)
 
-[Install](#install) · [Durable delivery](#durable-delivery) · [Request isolation](#request-isolation) · [Browser](#browser) · [API reference](docs/SDK.md)
+[Install](#install) · [Durable delivery](#durable-delivery) · [Browser](#browser) · [Limits](#guarantees-and-limits) · [API reference](docs/SDK.md)
 
 </div>
 
@@ -24,6 +24,8 @@ A monitoring SDK runs inside someone else's application. It has to collect usefu
 **tinytrace demonstrates that engineering problem in a readable, self-contained project.** Version 1 completed the capture-to-ingest loop in 789 handwritten lines. Version 2 adds operational SDK features: bounded persistent outboxes, isolated scopes, application-specific redaction, browser capture, framework integration, source maps, spans, and a Sentry envelope adapter.
 
 The project ends at the SDK boundary. Its included ingest server remains a loopback demonstration, with in-memory grouping and deduplication. Hosting a shared monitoring service, storing server-side history, dashboards, and alerting are outside this release.
+
+**Project status: v2 feature scope complete.** Capture, delivery, privacy, lifecycle handling, the local ingest demo, tests, CI, and npm publication are implemented, together with the documented v2 extensions. Deployment-specific validation remains the application's responsibility.
 
 ## What v2 includes
 
@@ -54,13 +56,16 @@ All installed dependencies are development tools or test fixtures. **The publish
 
 ## Install
 
+Requires **Node.js 22+** for the Node entry. Install the package in your application:
+
 ```sh
 npm install @garvj65/tinytrace
 ```
 
+For a local receiver, follow the [source checkout setup](#local-demo-and-verification), then run `npm run ingest` in a separate terminal. It listens at `http://127.0.0.1:4318/events` and prints grouped events. With that server running, save this example as `example.mjs` and run `node example.mjs`:
+
 ```js
 import { init, captureException, setTag, addBreadcrumb, close } from '@garvj65/tinytrace';
-// CommonJS: const { init, captureException, close } = require('@garvj65/tinytrace');
 
 init({ endpoint: 'http://127.0.0.1:4318/events', environment: 'development' });
 setTag('service', 'checkout');
@@ -69,7 +74,17 @@ captureException(new Error('Payment provider unavailable'));
 console.log('Delivered:', await close(2000));
 ```
 
-Start the included server from a source checkout with `npm run ingest`.
+`close()` ends this short script's SDK lifecycle. A long-running application keeps the client active and calls `close()` during its own shutdown flow. CommonJS applications can load the same Node client with `require('@garvj65/tinytrace')`.
+
+| API | Purpose |
+| --- | --- |
+| `init`, `captureException`, `captureMessage` | Configure a destination and capture events; capture returns an accepted event ID or `undefined`. |
+| `setTag`, `addBreadcrumb`, `withScope` | Attach bounded context and isolate concurrent operations. |
+| `startSpan`, `registerSourceMap` | Measure scoped work and map registered generated stack locations. |
+| `captureExceptionAsync`, `persist` | Wait for storage work; crash durability requires persistent mode. |
+| `flush`, `close`, `getStats` | Attempt delivery, release SDK resources, and inspect delivery/storage counters. |
+
+See the [SDK reference](docs/SDK.md) for types, defaults, limits, and return-value contracts. Hooks can filter events by returning `null`; `sampleRate` controls errors/messages and `tracesSampleRate` independently controls root transactions.
 
 ## Durable delivery
 
@@ -78,7 +93,7 @@ import { init, captureExceptionAsync, getStats, close } from '@garvj65/tinytrace
 
 init({
   endpoint: 'http://127.0.0.1:4318/events',
-  durable: { directory: './private-tinytrace-outbox', maxEvents: 1000, maxBytes: 16 * 1024 * 1024 }
+  durable: { directory: '../private-tinytrace-outbox', maxEvents: 1000, maxBytes: 16 * 1024 * 1024 }
 });
 const id = await captureExceptionAsync(new Error('Provider offline'));
 console.log('Persisted:', id, getStats());
@@ -89,7 +104,7 @@ Persistent mode writes sanitized events before sending, retains transient failur
 
 `captureException()` returns an ID after acceptance into the bounded write queue. **With persistent mode enabled, `captureExceptionAsync()` or `await persist()` is the persistence barrier.** A hard kill before that barrier can still lose an event. Filesystem/device failures, browser eviction, exhausted capacity, retention expiry, and permanent server rejection can also lose data. A crash after acceptance but before local acknowledgement can cause a duplicate; stable IDs let the receiver deduplicate.
 
-Use a private directory on a persistent local volume, unique to one live SDK instance on one machine. The outbox binds itself to its destination and rejects another live owner or destination. Linux/macOS writes sync file data and directory entries; Node's portable APIs cannot sync directory entries on Windows. Browser durability requires IndexedDB, Web Crypto, and Web Locks on a secure origin. Storage failures are observable through `getStats()` and fail closed.
+The relative example path is outside the checkout; choose a private directory on a persistent local volume and keep event storage out of version control. Use a unique directory for each live SDK instance on one machine. The outbox binds itself to its destination and rejects another live owner or destination. Linux/macOS writes sync file data and directory entries; Node's portable APIs cannot sync directory entries on Windows. Browser durability requires IndexedDB, Web Crypto, and Web Locks on a secure origin. Storage failures are observable through `getStats()` and fail closed.
 
 ## Request isolation
 
@@ -172,19 +187,34 @@ Spans measure async work, correlate captured errors, preserve callback return va
 
 Register source maps explicitly using the generated filename that appears in the stack. Only flat v3 mappings are supported; indexed maps and automatic artifact discovery are outside this release. Node can also use its native `--enable-source-maps` stack support.
 
-To send supported events as Sentry envelopes, initialize with `dsn: 'https://PUBLIC_KEY@YOUR_INGEST_HOST/PROJECT_ID'` instead of `endpoint`. The adapter's error, message, and transaction payloads are contract-tested against a local receiver using the current published protocol. A live Sentry account was not used for validation. Sessions, attachments, profiling, and complete Sentry SDK feature parity are outside scope. See the [protocol references](docs/SDK.md#protocol-references).
+To send supported events as Sentry envelopes, initialize with `dsn: 'https://PUBLIC_KEY@YOUR_INGEST_HOST/PROJECT_ID'` instead of `endpoint`. Replace the placeholders with your public DSN; the project ID must be numeric. The adapter's error, message, and transaction payloads are contract-tested against a local receiver using the documented protocol. A live Sentry account was not used for validation. Sessions, attachments, profiling, and complete Sentry SDK feature parity are outside scope. See the [protocol references](docs/SDK.md#source-maps-and-protocol-references).
 
-## Demo and verification
+## Guarantees and limits
+
+| Boundary | Contract |
+| --- | --- |
+| Delivery | Background networking with bounded queues, timeouts, and retries. Memory-only delivery is best effort; durable mode improves recovery without guaranteeing lossless or exactly-once delivery. |
+| Host lifecycle | Normal SDK failures are contained. Node fatal errors still follow the shutdown policy: host handlers retain ownership; otherwise the SDK attempts a bounded flush and exits with code 1. SIGTERM/SIGINT remain application-owned. |
+| Context | Node scopes isolate async work. Global setters outside a scope remain baseline context; browser async work requires the supplied scoped client. |
+| Privacy | Patterns and explicit application rules reduce exposure. They cannot discover arbitrary sensitive data, and persistent records are plaintext. |
+| Compatibility | CI verifies Linux Node 22/24/26, Windows Node 24, Express 5, and Chromium. Other engines/frameworks are not verified. |
+| Advanced features | Source maps are explicitly registered flat v3 maps; spans have no distributed header propagation; Sentry support is a locally contract-tested subset. |
+| Receiver | The bundled server is unauthenticated, loopback-only, and in memory. It is intended for local demonstrations. |
+
+Before relying on a deployment, exercise its storage permissions, outage/restart/shutdown behavior, and application-specific privacy rules. Validate a live Sentry destination if using that adapter. Passing automated checks is evidence for the tested contracts; it does not prove every possible defect is absent.
+
+## Local demo and verification
 
 ```sh
 git clone https://github.com/garvj65/tinytrace.git
 cd tinytrace
 npm ci
 npm run check
-npx playwright install chromium
+npx playwright install --with-deps chromium
 npm run test:browser
-npm run demo
 ```
+
+`npm run check` builds the SDK, runs the Node suite, enforces the code budget, runs the self-contained demo, and verifies clean package consumers. Run `npm run demo` to replay just the demo, or `npm run ingest` to leave the receiver running for your own application. Chromium installation may require OS package-install permissions on Linux; if its system libraries are already installed, `npx playwright install chromium` installs only the browser.
 
 ![tinytrace local demo: three events delivered and grouped into two issues](docs/demo.gif)
 
@@ -194,9 +224,12 @@ npm run demo
 | `npm run verify:package` | Install the tarball without dev dependencies; test HTTP, ESM/CJS identity, and Node/browser declarations. |
 | `npm run test:browser` | Real Chromium capture, scopes, privacy, spans, IndexedDB reloads, tab ownership, and envelope delivery. |
 | `npm run check` | Node regressions, size guard, local demo, and clean package consumers. |
+| `npm audit --audit-level=low` / `npm audit signatures` | Dependency advisories and registry signatures/attestations, including development tools. |
 | `npm run verify:registry` | Wait for registry propagation and compare published integrity with the locally rebuilt tarball. |
 
-CI tests Linux Node 22/24/26 and Windows Node 24, plus Chromium, full-history secret scanning, CodeQL security-extended queries, npm advisories, and registry signatures. The expanded v2 has a runtime budget below 1800 lines and total code budget below 3500 lines; the original sub-800-line milestone applies to v1.
+The final SDK suite contains **59 Node tests**, plus real Chromium scenarios and installed-package checks. CI also runs full-history secret scanning, CodeQL security-extended queries, npm advisories, and registry signatures. See [current CI results](https://github.com/garvj65/tinytrace/actions/workflows/ci.yml) and [npm release results](https://github.com/garvj65/tinytrace/actions/workflows/publish.yml) for authoritative outcomes. Registry integrity verification requires the exact published release checkout, including README bytes.
+
+The expanded v2 has a runtime budget below 1800 lines and total code budget below 3500 lines; the original sub-800-line milestone applies to v1.
 
 [SDK reference](docs/SDK.md) · [Validation and limits](docs/VALIDATION.md) · [Release guide](RELEASING.md) · [Changelog](CHANGELOG.md) · [Security](SECURITY.md)
 
