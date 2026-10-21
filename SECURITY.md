@@ -1,23 +1,32 @@
 # Security scope
 
-tinytrace is a small Node.js monitoring SDK and loopback ingest demonstration. The application, SDK configuration, endpoint selection, and `beforeSend` code are trusted. Exception contents, captured context, and incoming ingest bodies are treated as untrusted data.
+Report a suspected vulnerability through the repository's available private GitHub security reporting channel. If private reporting is unavailable, contact the maintainer through a private channel before posting sensitive details. Never include real credentials, customer data, or exploit payloads containing private data in a public issue.
 
-## Protections and boundaries
+## Trust boundaries
 
-- Hook output is serialized into a bounded snapshot, validated against the event schema, and stripped of unknown fields before batching.
-- Pattern-based redaction is enabled by default and covers supported event fields and tag keys. It is not a universal PII detector. `beforeSend` receives original data; application hooks and host loggers must apply their own privacy policy.
-- SDK fatal diagnostics contain no raw exception. Event fingerprints are recomputed after default redaction; hashes alone are not anonymization.
-- The queue includes the active batch in its capacity bound. Event bodies, request duration, retry counts, and retry waits are bounded. HTTP redirects are not followed, and TLS certificate validation uses Node defaults.
-- The CLI ingest server binds to `127.0.0.1`, limits request/batch sizes, and bounds groups/deduplication history. It has no authentication or durable storage and must not be exposed as a public service.
-- Use HTTPS for remote ingest destinations. Process-wide tags/breadcrumbs are not tenant or request isolation.
-- Node lifecycle interception is explicit. Once the host registers an error handler, it owns shutdown until reinitialization; removing a host handler does not hand ownership back to the SDK. Frameworks that own this lifecycle can disable `globalHandlers`.
+- Application options, endpoints/DSNs, hooks, source maps, and integration callbacks are trusted configuration/code.
+- Captured errors and context may contain sensitive data. Hook output, recovered storage records, and network responses require validation.
+- Persistent storage is private host/origin state, bound to one destination and one active instance. Do not use shared network directories or databases simultaneously across clients.
+- The npm publish token is available only to the guarded release step; tests do not need secrets. CI actions are pinned by commit SHA.
 
-## Automated checks
+## Properties reviewed and tested
 
-CI runs Gitleaks against Git history, CodeQL security-extended queries, npm advisory checks including development dependencies, registry signature verification, and functional/privacy/lifecycle/package regression tests. Third-party actions are pinned to reviewed commit SHAs. Checkout credentials are not persisted. Publish credentials are confined to the trusted release job.
+SDK failures must be contained at capture/transport/storage boundaries. Async application callbacks retain normal errors/returns. Queues, payloads, context, spans, map registries, disk records, retries, and retention are bounded. Requests have deadlines. SDK timers/sockets do not keep a healthy Node process alive; OS filesystem operations may remain active until complete.
 
-These checks do not establish that the software is free of all defects or that arbitrary sensitive data can never be captured. Review deployment-specific data policies and keep Node.js and development dependencies updated.
+Default and application-specific redaction run before persistence/transmission; unknown schema fields are stripped and fingerprints recomputed. Hooks see raw input and remain responsible for their own logging. Literal domain rules avoid executing arbitrary user-supplied regular expressions. No request headers, bodies, URLs, cookies, or authentication data are collected automatically by framework integration.
 
-## Reporting
+Node outbox files are written privately and atomically; POSIX directories require 0700. Symlinked final directories/files are rejected, invalid recovery records are discarded individually, and destination mismatch/live ownership prevent replay. Existing valid records are preserved when a configuration lowers capacity. Browser outboxes use strict IndexedDB transactions and Web Locks. Storage errors are observable and prevent transmission from an uninitialized store.
 
-Use GitHub private vulnerability reporting if enabled. Otherwise, open a public issue containing only a non-sensitive summary and request a private reporting channel. Never post credentials, unredacted customer recordings, private-key material, or sensitive event payloads in a public issue.
+Explicit source maps are bounded data; the SDK does not download maps or execute/read source files. Public Sentry DSNs are routed only through the configured receiver; secret DSN passwords are rejected. Browser fetch omits ambient credentials and rejects redirects. Fatal diagnostics contain no original exception text.
+
+## Limits
+
+Redaction cannot discover every kind of private data. Outbox files and IndexedDB records are plaintext; device/origin access controls and encryption remain the host's responsibility. XSS, malicious application code/hooks, OS administrators, compromised local volumes, and malicious dependency/toolchain execution are outside the SDK's isolation boundary. Hooks can block the event loop because they execute in-process.
+
+Persistent delivery is not lossless or exactly once. A kill before the persistence barrier, OS/device/browser failure, browser eviction, finite capacity/retention, or permanent server rejection can lose events. A crash around acknowledgement can duplicate them. Windows directory-entry durability and multi-host locking are not guaranteed by the portable implementation. PID reuse can conservatively block recovery.
+
+The included ingest server is a localhost demo without authentication, durable storage, or cross-origin configuration. Public deployment requires a separate service threat model and access controls. The Sentry adapter covers a tested wire subset and does not implement Sentry's entire quota-category protocol or feature set.
+
+## Automated gates
+
+Full-history Gitleaks, CodeQL security-extended with a zero-findings gate, npm advisories including dev dependencies, registry signature checks, cross-platform regressions, real Chromium tests, clean package consumers, and published artifact integrity checks run through GitHub Actions. These checks reduce risk; they do not certify an absence of vulnerabilities.

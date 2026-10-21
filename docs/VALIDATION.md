@@ -1,29 +1,32 @@
-# v1 validation
+# V2 validation
 
-The committed CI workflow is the source of current pass/fail evidence: [Actions](https://github.com/garvj65/tinytrace/actions) and [hardening PR](https://github.com/garvj65/tinytrace/pull/1).
+The authoritative current results are the [CI runs](https://github.com/garvj65/tinytrace/actions/workflows/ci.yml) and [npm release runs](https://github.com/garvj65/tinytrace/actions/workflows/publish.yml). A release is complete only after exact-commit CI and registry integrity verification succeed.
 
-| Check | Verification |
+| Check | Evidence exercised |
 | --- | --- |
-| Strict TypeScript build | ESM JavaScript and declarations; checked indices and unused locals/parameters. |
-| Regression suite | 39 tests, including host on/once/prepended handlers before and after init, strict rejection deduplication, privacy, hook schema rejection, real HTTP Retry-After, and ingest validation. |
-| Platforms | Linux Node 22, 24, 26; Windows Node 24. |
-| Lifecycle bounds | Child-process shutdown duration, confirmed in-flight background requests, and repeated listener cleanup. |
-| Demo | Real loopback HTTP: 3 events grouped into 2 issues, delivery true. The GIF illustrates this flow; fingerprint values may differ across releases. |
-| Package consumer | Install the actual tarball without development dependencies; exercise HTTP delivery and default redaction, then type-check consumer imports and an intentionally invalid option. |
-| Size | 789 handwritten TypeScript/JavaScript lines including tests, demo, and verification scripts; 410 lines are runtime SDK/server code. CI enforces fewer than 800 lines. |
-| Secret scanning | Gitleaks 8.24.3 with full Git history. Test tokens are synthetic. |
-| Static analysis | CodeQL JavaScript/TypeScript security-extended queries; CI fails if the generated SARIF contains findings. |
-| Dependency integrity | npm advisory checks including development dependencies and npm registry signature verification. Runtime dependencies: zero. |
-| Release | Trusted exact-commit CI gate, publish provenance, and registry tarball integrity comparison. Requires authenticated npm publishing permission. |
+| Strict builds | ESM/browser modules, CommonJS output, declarations, checked indexing, unused parameters/locals. |
+| V1 regressions | Original capture, privacy, stack, retry, batching, dedup, sampling, hook, and fatal lifecycle tests retained. |
+| Hard-crash recovery | A child persists a sanitized event, is killed, and a new client replays its original ID. |
+| Durable failure modes | Transient-cycle retention, persistent Retry-After across restart, permanent rejection, file/capacity bounds, wrong destinations, live owners, corrupt/expired/symlink records, and runtime expiry. |
+| Context isolation | Concurrent async siblings, nested scope restoration, unchanged callback exceptions, and independent request tags. |
+| Frameworks | Real Express 5 concurrent failing requests and native Node HTTP rejection handling. |
+| Mapping/tracing | Flat v3 mappings, malformed VLQ rejection, browser stacks, child-parent IDs, correlated errors, and separate transaction hooks/sampling. |
+| Protocol | Local HTTP receiver validates public-DSN endpoint routing, authenticated envelopes, UTF-8 lengths, exception frame order, transactions, and browser envelopes. |
+| Browser | Real Chromium global errors/rejections, explicit async scopes, privacy, spans, credential omission, IndexedDB persistence/reload, tab ownership, destination mismatch, and byte limits. |
+| Package consumers | Install the actual tarball without dev dependencies; exercise real HTTP, CommonJS/ESM singleton identity, integrations entry, and Node/browser TypeScript declarations. |
+| Platforms | Linux Node 22/24/26, Windows Node 24; Chromium via Playwright. |
+| Size | Runtime below 1800 lines and all handwritten runtime/tests/examples/scripts below 3500; v1's 789-line milestone is historical. |
+| Secrets | Full reachable Git history with Gitleaks. Test credentials and IDs are synthetic. |
+| Static analysis | CodeQL JavaScript/TypeScript security-extended; generated SARIF findings fail CI. |
+| Dependencies | npm audit including dev tools and npm audit signatures; no runtime dependencies. |
+| Release | Exact trusted main commit, public npm provenance, bounded propagation polling, and SHA-512 tarball integrity comparison. |
 
-## Contract checks
+## Scope of the evidence
 
-Queue overflow, exhausted retries, and retry hints beyond budget can lose events by design. A timed-out flush leaves background work running; close cancels it. Flush reports any transport-level loss since initialization. Delivery is in-memory and best effort.
+A passed test suite is evidence for these contracts, not proof that every possible defect is absent. Storage durability still depends on the OS, volume, browser, and completion of the persistence barrier. Disk exhaustion, denial, eviction, retention, permanent receiver rejection, and kills before persistence can lose data. Crash windows around acknowledgement can duplicate events.
 
-Host lifecycle ownership is recorded when its handler exists at initialization or is registered later and remains delegated until reinitialization. This avoids inferring ownership from a listener count that changes while `once` handlers execute. Frameworks can use `globalHandlers: false`. The SDK does not reproduce every Node rejection flag or custom exception-capture callback behavior.
+Windows does not provide portable directory fsync through Node; multi-host/network-filesystem outboxes are unsupported. Browser tests cover Chromium, not every engine. Browser async isolation uses explicit scoped clients; uncaught global errors carry baseline context. Source maps are explicitly registered flat v3 maps. Tracing is basic scoped/request duration measurement without distributed header propagation.
 
-Redaction is pattern-based and applied after the hook and schema snapshot. It covers supported fields, duplicated exception messages, tag keys/values, recognized credential formats, emails, and home-directory usernames. It does not identify every possible secret or personal-data format. Hooks and application loggers remain trusted code and can expose their own input.
+The Sentry wire subset is validated against a local contract receiver and the official documented format. No live Sentry account was configured, so production acceptance by a particular Sentry deployment remains an integration check for its owner. Sessions, attachments, and Sentry SDK feature parity are not claimed.
 
-The ingest server is a bounded, unauthenticated loopback demo. Public hosting, durable delivery, request-local context, source maps, UI, framework adapters, and Sentry protocol compatibility remain outside v1.
-
-The initial environment was unavailable during this hardening pass; executable verification is performed on GitHub-hosted runners. Passing checks provide evidence for the tested contracts, not a guarantee that every possible defect is absent.
+The ingest server remains an unauthenticated loopback demo with bounded in-memory grouping. A hosted backend, durable server history, UI, authentication, and alerting are outside the final SDK scope.

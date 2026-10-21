@@ -1,6 +1,10 @@
 node_modules/
 dist/
+dist-cjs/
+playwright-report/
+test-results/
 *.tgz
 coverage/
 .npmrc
 .env*
+

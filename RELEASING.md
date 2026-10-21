@@ -1,44 +1,40 @@
-# Releasing tinytrace 1.0.0
+# Releasing tinytrace
 
-Package: **`@garvj65/tinytrace`**. Repository: [garvj65/tinytrace](https://github.com/garvj65/tinytrace). The unscoped `tinytrace` name belongs to another package. Verify npm-account ownership or publishing permission for the configured scope before releasing.
+The package is `@garvj65/tinytrace`. Version 1.0.0 is the initial published SDK; version 2.0.0 is the final operational/platform expansion. npm versions are immutable.
 
-## What the automated release does
+## Release process
 
-[Publish npm](.github/workflows/publish.yml) runs after a successful trusted main-branch CI push, or can be started manually on main. It checks that CI passed for the exact checked-out commit, installs the lockfile with lifecycle scripts disabled, checks npm advisories and registry signatures, and publishes with provenance. The publish lifecycle runs the full tests, size guard, demo, and clean-consumer package/type checks before publishing.
+1. Update version in package.json and both root version fields in package-lock.json. Add changelog/migration notes.
+2. Run npm ci --ignore-scripts, npm run check, npm run test:browser, npm audit --audit-level=low, and npm audit signatures. Install the pinned Playwright Chromium binary first if needed.
+3. Open a PR and inspect the exact changed runtime paths, package exports, persistence/privacy contracts, docs, and CI results. The main-branch CI matrix includes browser, security, and CodeQL jobs.
+4. Merge only after those checks succeed. Publish npm runs after trusted main-branch push CI succeeds and checks the exact release SHA again. The workflow uses Node 24 and npm 11.9.0, LF output, and an uncached release install.
+5. Publishing runs package-consumer tests, attaches public provenance, and verifies the registry name/version and SHA-512 tarball integrity against a deterministic local pack. Registry propagation is polled for up to roughly four minutes plus request timeouts.
+6. Inspect the successful release run and npm page. An existing immutable version is skipped and still integrity-verified. A different artifact with the same version fails verification; it must not be overwritten.
 
-CI includes Linux Node 22/24/26, Windows Node 24, Gitleaks history scanning, and CodeQL security-extended queries. Test jobs never receive a publishing token. Release credentials are available only to the trusted publish job.
+The verifier reads validated stable-version metadata from npm run. Only package.json/lockfile version fields need updating for future stable versions; registry verification and artifact names are version-independent. The verified tarball is retained as a main CI artifact for 14 days. README/package bytes are part of the immutable artifact: changing them without a version bump means the current tree will no longer reproduce the previous tarball.
 
-An existing immutable npm version is not overwritten. The final step compares the registry tarball's SHA-512 integrity with a fresh local pack. A different artifact under the same version fails verification: increment the version rather than attempting to replace it.
+## Publishing authentication
 
-## Authenticate the first release
+The GitHub repository secret NPM_TOKEN must hold a granular token with package/scope publish access and the noninteractive 2FA policy needed by npm publish. Keep it out of files/chat/logs. Tokens expire; rotate/revoke them through npm and update the repository secret. The secret is passed only to the publish step.
 
-The repository cannot infer npm account ownership from a GitHub username. Choose an authenticated publisher:
-
-- **GitHub release:** add a granular npm publishing token as the repository Actions secret `NPM_TOKEN`. It must authorize this package/scope and satisfy the npm account's 2FA policy. Do not paste the token into chat, files, workflow text, or commits. Run **Publish npm → Run workflow → main**, or rerun its failed publishing job after authentication is configured.
-- **Local first publish:** clone the verified main branch, run `npm ci`, `npm login`, `npm whoami`, `npm run check`, `npm audit --audit-level=low`, and `npm audit signatures`. Then run `npm publish --access public` followed by `npm run verify:registry`. Local publishing does not generate GitHub provenance.
-
-If the npm username differs from `garvj65`, update the package name, lockfile, README, and consumer-test import references before publishing, then run CI again.
-
-## Prefer OIDC for later releases
-
-After the package exists, configure its npm trusted publisher:
+After the package exists, npm trusted publishing can replace this bootstrap token. In the package's npm settings, add GitHub Actions with:
 
 | Field | Value |
 | --- | --- |
-| Organization/user | `garvj65` |
-| Repository | `tinytrace` |
-| Workflow filename | `publish.yml` |
-| Allowed action | Explicitly allow `npm publish` |
-| Environment | Leave empty; this workflow has no GitHub environment binding |
+| Organization/user | garvj65 |
+| Repository | tinytrace |
+| Workflow filename | publish.yml |
+| Environment | Blank (no environment is used by this workflow) |
+| Allowed action | Explicitly allow npm publish |
 
-The workflow uses Node 24 and npm 11.9.0, meeting npm's documented trusted-publishing requirements. Once OIDC publishing is verified, revoke/remove the bootstrap `NPM_TOKEN`. Never publish on untrusted pull-request events.
+The workflow already grants id-token: write and uses a supported npm/Node toolchain. Validate a new-version publish through OIDC before revoking/removing NPM_TOKEN. Do not try to republish an existing version as a credential test. Consult [current npm trusted-publisher documentation](https://docs.npmjs.com/trusted-publishers/) when making account changes.
 
-See npm's official [publishing guide](https://docs.npmjs.com/creating-and-publishing-scoped-public-packages/) and [trusted-publisher guide](https://docs.npmjs.com/trusted-publishers/).
+## V1 to v2 migration
 
-## Version changes
+Existing Node capture/init/tag/breadcrumb/flush/close calls continue to work, and ESM/CommonJS share a client. Fingerprints change to a portable grouping algorithm, so old/new versions can form different groups. Error and message redaction remains enabled by default. Payloads additionally support browser platform, release, trace contexts, spans, and transaction events; a custom receiver should accept these fields.
 
-Bump `package.json`, both root version fields in `package-lock.json`, and the fixed package/version allowlist in `scripts/verify-registry.mjs` together. Every published package artifact is immutable, including its packaged README and reference docs. A change to shipped content needs a new version before the next publish. Check the published version and integrity using `npm run verify:registry`; a green source CI run alone does not prove publication.
+Persistent mode is opt-in. Use a private persistent local directory on Node or a distinct browser database per live client; add domain privacy rules before enabling storage. A synchronous capture ID does not confirm disk persistence: use captureExceptionAsync or persist. Transient exhausted retries remain queued in durable mode, so flush/close can return false while recoverable records remain on disk.
 
-For byte-for-byte registry integrity verification, use the release toolchain: Node 24 and npm 11.9.0. Text checkout and emitted JavaScript use LF on all platforms. A different packaging toolchain may produce different archive bytes even for equivalent source.
+Wrap concurrent Node work in withScope or use request middleware. Browser async code must use the callback's explicit scope. beforeSend remains the error/message hook; beforeSendTransaction handles transactions. Source maps must be registered explicitly, or use Node's native source-map flag.
 
-The successful Linux Node 24 CI job retains the verified npm tarball as a GitHub Actions artifact for 14 days. Download it from the CI run's Artifacts section to install or inspect the exact candidate package without rebuilding.
+The browser entry needs an ingest endpoint with an appropriate CORS policy. The included CLI server remains a localhost demo. Public Sentry DSNs use a tested error/message/basic-transaction envelope subset; a live Sentry project must be checked by its owner before relying on that deployment.

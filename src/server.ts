@@ -1,5 +1,4 @@
 import { createServer } from 'node:http';
-import { pathToFileURL } from 'node:url';
 import type { TraceEvent } from './types.js';
 
 export function createIngest(log: (line: string) => void = console.log) {
@@ -37,8 +36,4 @@ export function createIngest(log: (line: string) => void = console.log) {
   server.headersTimeout = 5000;
   return { server, groups };
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const { server } = createIngest();
-  server.on('error', err => { console.error(err.message); process.exitCode = 1; });
-  server.listen(4318, '127.0.0.1', () => console.log('tinytrace ingest: http://127.0.0.1:4318/events'));
-}
+

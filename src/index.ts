@@ -1,30 +1,30 @@
 import { writeSync } from 'node:fs';
-import { buildEvent, text } from './event.js';
-import { prepareEvent } from './privacy.js';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { ScopeClient } from './client.js';
+import { resolveTarget } from './sentry.js';
 import { Transport } from './transport.js';
-import { bounded, type Breadcrumb, type Options, type TraceEvent } from './types.js';
-export type { Options, TraceEvent, Breadcrumb, Frame } from './types.js';
+import { bounded, type Options, type Scope } from './types.js';
+export type { Options, TraceEvent, Breadcrumb, Frame, RedactionOptions, DurableOptions, DeliveryStats, Scope, SpanData, TraceContext } from './types.js';
+export { ScopeClient } from './client.js';
 export { redactEvent } from './privacy.js';
+export { registerSourceMap, clearSourceMaps, type RawSourceMap } from './sourcemaps.js';
+export { encodeEnvelope, toSentryEvent } from './sentry.js';
 
 let client: Client | undefined;
-class Client {
-  private tags: Record<string, string> = Object.create(null);
-  private crumbs: Breadcrumb[] = [];
-  private capturing = false;
+const disabled = new ScopeClient({});
+class Client extends ScopeClient {
+  declare readonly transport: Transport;
   private fatal = false;
   private forwarded = false;
-  private closed = false;
   private hostException = false;
   private hostRejection = false;
   private strict = new Set<unknown>();
-  private rate: number;
   private shutdown: number;
-  readonly transport: Transport;
-  constructor(private options: Options, endpoint: URL) {
-    this.rate = typeof options.sampleRate === 'number' && Number.isFinite(options.sampleRate)
-      ? Math.max(0, Math.min(1, options.sampleRate)) : 1;
+  constructor(options: Options) {
+    const target = resolveTarget(options), storage = new AsyncLocalStorage<Scope>();
+    const transport = new Transport(target.endpoint, options, target);
+    super(options, transport, { current: () => storage.getStore(), run: (scope, fn) => storage.run(scope, fn) });
     this.shutdown = bounded(options.shutdownTimeout, 2000, 1, 60000);
-    this.transport = new Transport(endpoint, options);
     if (options.globalHandlers !== false) {
       this.hostException = process.listenerCount('uncaughtException') > 0 || process.hasUncaughtExceptionCaptureCallback();
       this.hostRejection = process.listenerCount('unhandledRejection') > 0;
@@ -32,34 +32,6 @@ class Client {
       process.on('uncaughtException', this.onException);
       process.on('unhandledRejection', this.onRejection);
     }
-  }
-  capture(value: unknown, error: boolean, mechanism: TraceEvent['mechanism'] = 'manual'): string | undefined {
-    if (this.closed || this.capturing || Math.random() >= this.rate) return;
-    this.capturing = true;
-    try {
-      let event: TraceEvent | null = buildEvent(value, error);
-      event.environment = text(this.options.environment ?? process.env.NODE_ENV ?? 'development', 64);
-      event.tags = { ...this.tags }; event.breadcrumbs = this.crumbs.map(c => ({ ...c }));
-      if (error) event.mechanism = mechanism;
-      if (this.options.beforeSend) event = this.options.beforeSend(event);
-      if (!event) return;
-      if (typeof (event as unknown as { then?: unknown }).then === 'function') {
-        void Promise.resolve(event).catch(() => {}); return;
-      }
-      event = prepareEvent(event, this.options.redact !== false);
-      return event && this.transport.enqueue(event) ? event.event_id : undefined;
-    } catch { return undefined; }
-    finally { this.capturing = false; }
-  }
-  tag(key: string, value: string): void {
-    const k = text(key, 128);
-    if (Object.hasOwn(this.tags, k) || Object.keys(this.tags).length < 32) this.tags[k] = text(value, 256);
-  }
-  breadcrumb(value: string | Pick<Breadcrumb, 'message' | 'category'>): void {
-    const item = typeof value === 'string' ? { message: value } : value;
-    this.crumbs.push({ timestamp: new Date().toISOString(), message: text(item.message, 512),
-      ...(item.category ? { category: text(item.category, 128) } : {}) });
-    if (this.crumbs.length > 20) this.crumbs.shift();
   }
   private onNewListener = (name: string | symbol, listener: unknown): void => {
     // Ownership stays with the host until reinit, even after a once listener removes itself.
@@ -93,26 +65,32 @@ class Client {
     process.off('newListener', this.onNewListener);
     process.off('uncaughtException', this.onException); process.off('unhandledRejection', this.onRejection);
   }
-  dispose(): void { this.detach(); this.transport.stop(); }
+  dispose(): void { this.detach(); void this.transport.shutdown(); }
 }
 export function init(options: Options): void {
   try {
-    const endpoint = new URL(options.endpoint);
-    if (!['http:', 'https:'].includes(endpoint.protocol)) return;
-    const next = { ...options };
-    client?.dispose(); client = undefined; client = new Client(next, endpoint);
+    resolveTarget(options);
+    client?.dispose(); client = undefined;
+    client = new Client({ ...options, environment: options.environment ?? process.env.NODE_ENV ?? 'development' });
   } catch {}
 }
-export function captureException(err: unknown): string | undefined { return client?.capture(err, true); }
-export function captureMessage(msg: string): string | undefined { return client?.capture(msg, false); }
-export function setTag(key: string, value: string): void { try { client?.tag(key, value); } catch {} }
-export function addBreadcrumb(value: string | Pick<Breadcrumb, 'message' | 'category'>): void {
-  try { client?.breadcrumb(value); } catch {}
+export function captureException(err: unknown): string | undefined { return client?.captureException(err); }
+export function captureExceptionAsync(err: unknown): Promise<string | undefined> { return client?.captureExceptionAsync(err) ?? Promise.resolve(undefined); }
+export function captureMessage(msg: string): string | undefined { return client?.captureMessage(msg); }
+export function setTag(key: string, value: string): void { client?.setTag(key, value); }
+export function addBreadcrumb(value: Parameters<ScopeClient['addBreadcrumb']>[0]): void { client?.addBreadcrumb(value); }
+export function withScope<T>(callback: (scope: ScopeClient) => T, initial?: Partial<Pick<Scope, 'tags' | 'breadcrumbs'>>): T {
+  return (client ?? disabled).withScope(callback, initial);
 }
-export function flush(timeout = 2000): Promise<boolean> { return client?.transport.flush(timeout) ?? Promise.resolve(true); }
+export function startSpan<T>(options: { name: string; op?: string }, callback: (scope: ScopeClient) => T | Promise<T>): Promise<T> {
+  return (client ?? disabled).startSpan(options, callback);
+}
+export function flush(timeout = 2000): Promise<boolean> { return client?.flush(timeout) ?? Promise.resolve(true); }
+export function persist(): Promise<boolean> { return client?.persist() ?? Promise.resolve(true); }
+export function getStats() { return (client ?? disabled).getStats(); }
 export async function close(timeout = 2000): Promise<boolean> {
   const current = client; client = undefined;
   if (!current) return true;
   current.detach();
-  try { return await current.transport.flush(timeout); } finally { current.dispose(); }
+  try { return await current.transport.flush(timeout); } finally { await current.transport.shutdown(); }
 }
